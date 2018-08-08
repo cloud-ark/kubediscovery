@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kube-provenance-apiserver
-  namespace: provenance
+  name: kube-discovery-apiserver
+  namespace: discovery
   labels:
     apiserver: "true"
 spec:
@@ -16,16 +16,16 @@ spec:
     spec:
       serviceAccountName: apiserver
       containers:
-      - name: kube-provenance-apiserver
-        image: kube-provenance-apiserver:latest
+      - name: kube-discovery-apiserver
+        image: kube-discovery-apiserver:latest
         imagePullPolicy: Never
-        command: [ "/kube-provenance-apiserver", "--etcd-servers=http://localhost:2379" ]
+        command: [ "/kube-discovery-apiserver", "--etcd-servers=http://localhost:2379" ]
         volumeMounts:
         - name: kind-compositions-volume
-          mountPath: /etc/kubeprovenance
+          mountPath: /etc/kubediscovery
         env:
         - name: KIND_COMPOSITION_FILE
-          value: /etc/kubeprovenance/kind_compositions.yaml
+          value: /etc/kubediscovery/kind_compositions.yaml
       - name: etcd
         image: quay.io/coreos/etcd:v3.2.18
       volumes:

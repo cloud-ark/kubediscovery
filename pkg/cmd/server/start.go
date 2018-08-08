@@ -10,19 +10,19 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
-	"github.com/cloud-ark/kubeprovenance/pkg/apiserver"
+	"github.com/cloud-ark/kubediscovery/pkg/apiserver"
 )
 
-const defaultEtcdPathPrefix = "/registry/kubeprovenance.clouarark.io"
+const defaultEtcdPathPrefix = "/registry/kubediscovery.clouarark.io"
 
-type ProvenanceServerOptions struct {
+type DiscoveryServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
 	StdOut                io.Writer
 	StdErr                io.Writer
 }
 
-func NewProvenanceServerOptions(out, errOut io.Writer) *ProvenanceServerOptions {
-	o := &ProvenanceServerOptions{
+func NewDiscoveryServerOptions(out, errOut io.Writer) *DiscoveryServerOptions {
+	o := &DiscoveryServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix, 
 			apiserver.Codecs.LegacyCodec(apiserver.SchemeGroupVersion)),
 		StdOut: out,
@@ -31,13 +31,13 @@ func NewProvenanceServerOptions(out, errOut io.Writer) *ProvenanceServerOptions 
 	return o
 }
 
-// NewCommandStartProvenanceServer provides a CLI handler for 'start master' command
-// with a default ProvenanceServerOptions.
-func NewCommandStartProvenanceServer(defaults *ProvenanceServerOptions, stopCh <-chan struct{}) *cobra.Command {
+// NewCommandStartDiscoveryServer provides a CLI handler for 'start master' command
+// with a default DiscoveryServerOptions.
+func NewCommandStartDiscoveryServer(defaults *DiscoveryServerOptions, stopCh <-chan struct{}) *cobra.Command {
 	o := *defaults
 	cmd := &cobra.Command{
-		Short: "Launch Provenance API server",
-		Long:  "Launch Provenance API server",
+		Short: "Launch Discovery API server",
+		Long:  "Launch Discovery API server",
 		RunE: func(c *cobra.Command, args []string) error {
 			if err := o.Complete(); err != nil {
 				return err
@@ -45,7 +45,7 @@ func NewCommandStartProvenanceServer(defaults *ProvenanceServerOptions, stopCh <
 			if err := o.Validate(args); err != nil {
 				return err
 			}
-			if err := o.RunProvenanceServer(stopCh); err != nil {
+			if err := o.RunDiscoveryServer(stopCh); err != nil {
 				return err
 			}
 			return nil
@@ -58,17 +58,17 @@ func NewCommandStartProvenanceServer(defaults *ProvenanceServerOptions, stopCh <
 	return cmd
 }
 
-func (o ProvenanceServerOptions) Validate(args []string) error {
+func (o DiscoveryServerOptions) Validate(args []string) error {
 	errors := []error{}
 	errors = append(errors, o.RecommendedOptions.Validate()...)
 	return utilerrors.NewAggregate(errors)
 }
 
-func (o *ProvenanceServerOptions) Complete() error {
+func (o *DiscoveryServerOptions) Complete() error {
 	return nil
 }
 
-func (o *ProvenanceServerOptions) Config() (*apiserver.Config, error) {
+func (o *DiscoveryServerOptions) Config() (*apiserver.Config, error) {
 	// TODO have a "real" external address
 	if err := o.RecommendedOptions.SecureServing.MaybeDefaultWithSelfSignedCerts("localhost", nil, []net.IP{net.ParseIP("127.0.0.1")}); err != nil {
 		return nil, fmt.Errorf("error creating self-signed certificates: %v", err)
@@ -86,7 +86,7 @@ func (o *ProvenanceServerOptions) Config() (*apiserver.Config, error) {
 	return config, nil
 }
 
-func (o ProvenanceServerOptions) RunProvenanceServer(stopCh <-chan struct{}) error {
+func (o DiscoveryServerOptions) RunDiscoveryServer(stopCh <-chan struct{}) error {
 	config, err := o.Config()
 	if err != nil {
 		return err

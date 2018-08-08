@@ -13,5 +13,5 @@
 # limitations under the License.
 
 FROM fedora
-ADD kube-provenance-apiserver /
-ENTRYPOINT ["/kube-provenance-apiserver"]
+ADD kube-discovery-apiserver /
+ENTRYPOINT ["/kube-discovery-apiserver"]

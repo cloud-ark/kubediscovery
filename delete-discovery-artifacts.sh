@@ -4,7 +4,7 @@
 #cp kubeprovenance ./artifacts/simple-image/kube-provenance-apiserver
 #docker build -t kube-provenance-apiserver:latest ./artifacts/simple-image
 
-kubectl delete ns provenance
+kubectl delete ns discovery
 kubectl delete -f artifacts/example/auth-delegator.yaml -n kube-system
 kubectl delete -f artifacts/example/auth-reader.yaml -n kube-system
 kubectl delete -f artifacts/example/apiservice.yaml

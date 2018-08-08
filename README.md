@@ -36,7 +36,7 @@ continuously querying the Kubernetes API for various Objects of different Kinds 
 
 The YAML file can contain both in-built Kinds (such as Deployment, Pod, Service), and
 Custom Resource Kinds (such as EtcdCluster).
-kubeprovenane API server registers REST endpoints for all the kinds that are defined in the YAML file.
+kubedsicovery API server registers REST endpoints for all the kinds that are defined in the YAML file.
 These endpoints will be accessed by `kubectl get` command when you want to retrieve the dynamic
 composition information (see examples below). An example YAML file is provided (kind_compositions.yaml).
 There is also kind_compositions.yaml.with-etcd which shows definition for the EtcdCluster custom resource.
@@ -65,18 +65,21 @@ Scripts are provided to help with building the API server container image and de
 
    `$ eval $(minikube docker-env)`
 
+1) Install/Vendor in dependencies:
 
-1) Build the API Server container image:
+   `$ dep ensure`
 
-   `$ ./build-provenance-artifacts.sh`
+2) Build the API Server container image:
 
-2) Deploy the API Server in your cluster:
+   `$ ./build-discovery-artifacts.sh`
 
-   `$ ./deploy-provenance-artifacts.sh`
+3) Deploy the API Server in your cluster:
 
-3) Clean-up:
+   `$ ./deploy-discovery-artifacts.sh`
 
-    `$ ./delete-provenance-artifacts.sh`
+4) Clean-up:
+
+    `$ ./delete-discovery-artifacts.sh`
 
 
 Once the kubediscovery API server is running, you can find the dynamic composition information by using following type of commands:
@@ -85,28 +88,28 @@ Once the kubediscovery API server is running, you can find the dynamic compositi
 1) Get dynamic composition for all deployments
 
 ```
-kubectl get --raw /apis/kubeprovenance.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
+kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubeprovenance/raw/master/docs/deployments.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-deployments.png)
 
 
 2) Get dynamic composition for a particular deployment
 
 ```
-kubectl get --raw /apis/kubeprovenance.cloudark.io/v1/namespaces/default/deployments/<dep-name>/compositions | python -mjson.tool
+kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/<dep-name>/compositions | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubeprovenance/raw/master/docs/hello-minikube-deployment.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/single-deployment.png)
 
 
-3) Get dynamic composition of all etcdclusters custom resource
+3) Get dynamic composition of all etcdclusters custom resource (if etcdclusters custom resource is registered in the cluster)
 
 ```
-kubectl get --raw /apis/kubeprovenance.cloudark.io/v1/namespaces/default/etcdclusters/*/compositions | python -mjson.tool
+kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/etcdclusters/*/compositions | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubeprovenance/raw/master/docs/etcd-clusters.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/etcd-clusters.png)
 
 You can use above style of commands with all the Kinds that you have defined in kind_compositions.yaml
 
@@ -115,12 +118,12 @@ You can use above style of commands with all the Kinds that you have defined in 
 
 1) Check that the API server Pod is running: 
 
-   `$ kubectl get pods -n provenance`
+   `$ kubectl get pods -n discovery`
 
 2) Get the Pod name from output of above command and then check logs of the container.
    For example:
 
-   `$ kubectl logs -n provenance kube-provenance-apiserver-klzpc  -c kube-provenance-apiserver`
+   `$ kubectl logs -n discovery kube-discovery-apiserver-kjz7p  -c kube-discovery-apiserver`
 
 
 ### References:
