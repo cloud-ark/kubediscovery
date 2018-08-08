@@ -14,10 +14,10 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	"github.com/cloud-ark/kubeprovenance/pkg/provenance"
+	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 )
 
-const GroupName = "kubeprovenance.cloudark.io"
+const GroupName = "kubediscovery.cloudark.io"
 const GroupVersion = "v1"
 
 var (
@@ -58,7 +58,7 @@ func init() {
 	)
 
 	// Start collecting provenance
-	go provenance.CollectProvenance()
+	go discovery.CollectProvenance()
 }
 
 type ExtraConfig struct {
@@ -70,8 +70,8 @@ type Config struct {
 	ExtraConfig   ExtraConfig
 }
 
-// ProvenanceServer contains state for a Kubernetes cluster master/api server.
-type ProvenanceServer struct {
+// DiscoveryServer contains state for a Kubernetes cluster master/api server.
+type DiscoveryServer struct {
 	GenericAPIServer *genericapiserver.GenericAPIServer
 }
 
@@ -100,14 +100,14 @@ func (cfg *Config) Complete() CompletedConfig {
 	return CompletedConfig{&c}
 }
 
-// New returns a new instance of ProvenanceServer from the given config.
-func (c completedConfig) New() (*ProvenanceServer, error) {
-	genericServer, err := c.GenericConfig.New("kube provenance server", genericapiserver.NewEmptyDelegate())
+// New returns a new instance of DiscoveryServer from the given config.
+func (c completedConfig) New() (*DiscoveryServer, error) {
+	genericServer, err := c.GenericConfig.New("kube discovery server", genericapiserver.NewEmptyDelegate())
 	if err != nil {
 		return nil, err
 	}
 
-	s := &ProvenanceServer{
+	s := &DiscoveryServer{
 		GenericAPIServer: genericServer,
 	}
 
@@ -117,14 +117,14 @@ func (c completedConfig) New() (*ProvenanceServer, error) {
 		return nil, err
 	}
 
-	installCompositionProvenanceWebService(s)
+	installCompositionWebService(s)
 
 	return s, nil
 }
 
-func installCompositionProvenanceWebService(provenanceServer *ProvenanceServer) {
-	for _, resourceKindPlural := range provenance.KindPluralMap {
-		namespaceToUse := provenance.Namespace
+func installCompositionWebService(discoveryServer *DiscoveryServer) {
+	for _, resourceKindPlural := range discovery.KindPluralMap {
+		namespaceToUse := discovery.Namespace
 		path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/"
 		path = path + namespaceToUse + "/" + strings.ToLower(resourceKindPlural)
 		fmt.Println("WS PATH:" + path)
@@ -134,7 +134,7 @@ func installCompositionProvenanceWebService(provenanceServer *ProvenanceServer) 
 			Produces(restful.MIME_JSON, restful.MIME_XML)
 		getPath := "/{resource-id}/compositions"
 		ws.Route(ws.GET(getPath).To(getCompositions))
-		provenanceServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws)
+		discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws)
 	}
 }
 
@@ -154,10 +154,10 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	//provenance.TotalClusterProvenance.PrintProvenance()
 
 	// Path looks as follows:
-	// /apis/kubeprovenance.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
+	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
 	resourcePathSlice := strings.Split(requestPath, "/")
 	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
-	provenanceInfo := provenance.TotalClusterProvenance.GetProvenance(resourceKind, resourceName)
+	provenanceInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceName)
 
 	response.Write([]byte(provenanceInfo))
 }
