@@ -46,7 +46,7 @@ kubectl get all
 
 1) Using kubediscovery you can find out composition tree of specific Kinds.
 
-2) You can find composition trees of all objects or a specific Object of a particular Kind.
+2) You can find composition trees of all objects or a specific object of a particular Kind.
 
 3) Works with Custom Resources.
 
@@ -121,7 +121,14 @@ You can use above style of commands with all the Kinds that you have defined in 
    `$ kubectl logs -n discovery kube-discovery-apiserver-kjz7p  -c kube-discovery-apiserver`
 
 
+### Issues/Suggestions:
+
+Issues and suggestions for improvement are welcome. Please file them [here](https://github.com/cloud-ark/kubediscovery/issues)
+
+
 ### References:
 
 The Aggregated API Server has been developed by refering to [sample-apiserver](https://github.com/kubernetes/sample-apiserver)
 and [custom-metrics-apiserver](https://github.com/kubernetes-incubator/custom-metrics-apiserver).
+
+
