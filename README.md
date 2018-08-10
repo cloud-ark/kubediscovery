@@ -5,27 +5,10 @@ A Kubernetes Aggregated API Server that helps with discovery of dynamic informat
 
 ## What is it?
 
-kubediscovery is a tool that helps you find dynamic information about your cluster. 
-Examples of such information include - dynamic composition tree of Kubernetes Objects, current and
-past values of config maps, actions that have been performed within your cluster.
-Today it is not straightforward to find out this information about your cluster.
-
-
-kubediscovery is a Kubernetes Aggregated API Server that solves this problem.
-The information obtained from kubediscovery can be used to determine how your cluster
-has evolved over time (its provenance/lineage). 
-Using this information one can answer questions such as:
-
-- How many deployments have occurred on a cluster?
-
-- What actions have been executed on a cluster?
-
-- How configuration values have changed over time?
-
-Current kubediscovery supports showing dynamic composition tree of Kubernetes Objects. 
+kubediscovery is a tool that helps you find dynamic composition tree of Kubernetes Objects. 
 In Kubernetes there are top-level resources which are composed of other resources. 
 For example, a Deployment is composed of a ReplicaSet which in turn is composed of one or more Pods. 
-Using kubediscovery you can find out this information easily today.
+kubediscovery is a Kubernetes Aggregated API Server that solves this problem.
 
 
 ## How does it work?
@@ -47,10 +30,9 @@ The dynamic composition information is currently collected for the "default" nam
 It is stored in memory. In the future we will store it in the Etcd instance that we run along with
 the API server. We use OwnerReferences to build the dynamic composition tree for Objects.
 For querying the main API server, we use direct REST calls instead of typed clients. 
-Note that this is the only option that we can use as we want to be able to query for Objects 
-based on what is defined in kind_compositions.yaml.
-Since we won't know what will be defined in this file in advance, we cannot use typed clients inside
-kubediscovery to query the main API server to build the dynamic composition tree.
+This is done because we want to be able to query for Objects 
+based on what is defined in kind_compositions.yaml, which we won't know in advance.
+So we cannot use typed clients inside kubediscovery to query the main API server to build the dynamic composition tree.
 
 In building this API server we tried several approaches. You can read about our experience  
 [here](https://medium.com/@cloudark/our-journey-in-building-a-kubernetes-aggregated-api-server-29a4f9c1de22).
