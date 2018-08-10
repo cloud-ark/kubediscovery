@@ -8,7 +8,7 @@ A Kubernetes Aggregated API Server that helps with discovery of dynamic informat
 kubediscovery is a tool that helps you find dynamic composition tree of Kubernetes Objects. 
 In Kubernetes there are top-level resources which are composed of other resources. 
 For example, a Deployment is composed of a ReplicaSet which in turn is composed of one or more Pods. 
-kubediscovery is a Kubernetes Aggregated API Server that solves this problem.
+kubediscovery is a Kubernetes Aggregated API Server that helps you find composition trees of Kubernetes objects.
 
 
 ## How does it work?
