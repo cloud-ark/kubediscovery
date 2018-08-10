@@ -38,6 +38,19 @@ In building this API server we tried several approaches. You can read about our 
 [here](https://medium.com/@cloudark/our-journey-in-building-a-kubernetes-aggregated-api-server-29a4f9c1de22).
 
 
+## How is it different than..
+
+```
+kubectl get all
+```
+
+1) Using kubediscovery you can find out composition tree of specific Kinds.
+
+2) You can find composition trees of all objects or a specific Object of a particular Kind.
+
+3) Works with Custom Resources.
+
+
 ## Try it on Minikube
 
 
