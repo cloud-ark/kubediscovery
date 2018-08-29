@@ -23,9 +23,3 @@ func main() {
 		glog.Fatal(err)
 	}
 }
-
-func Setup() {
-     fmt.Println("Entering Setup")
-     main()
-     fmt.Println("Exiting Setup")
-}
