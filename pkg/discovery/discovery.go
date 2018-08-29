@@ -15,6 +15,11 @@ import (
 	"context"
 	"gopkg.in/yaml.v2"
 	"github.com/coreos/etcd/client"
+	"flag"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
@@ -36,13 +41,26 @@ var (
 	ETCD_CLUSTER string
 )
 
+var (
+	masterURL  string
+	kubeconfig string
+	etcdservers string
+)
+
 func init() {
+
+	flag.StringVar(&kubeconfig, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+	flag.StringVar(&etcdservers, "etcd-servers", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
+
+	flag.Parse()
 	serviceHost = os.Getenv("KUBERNETES_SERVICE_HOST")
 	servicePort = os.Getenv("KUBERNETES_SERVICE_PORT")
 	Namespace = "default"
 	httpMethod = http.MethodGet
 
-	etcdServiceURL = "http://example-etcd-cluster-client:2379"
+	//etcdServiceURL = "http://example-etcd-cluster-client:2379"
+	etcdServiceURL = "http://localhost:2379"
 
 	DEPLOYMENT = "Deployment"
 	REPLICA_SET = "ReplicaSet"
@@ -54,11 +72,31 @@ func init() {
 	KindPluralMap = make(map[string]string)
 	kindVersionMap = make(map[string]string)
 	compositionMap = make(map[string][]string,0)
+
+	readKindCompositionFile()
+
+	// set basic data types
+	KindPluralMap[DEPLOYMENT] = "deployments"
+	kindVersionMap[DEPLOYMENT] = "apis/apps/v1"
+	compositionMap[DEPLOYMENT] = []string{"ReplicaSet"}
+
+	KindPluralMap[REPLICA_SET] = "replicasets"
+	kindVersionMap[REPLICA_SET] = "apis/extensions/v1beta1"
+	compositionMap[REPLICA_SET] = []string{"Pod"}
+
+	KindPluralMap[POD] = "pods"
+	kindVersionMap[POD] = "api/v1"
+	compositionMap[POD] = []string{}
+
+	KindPluralMap[SERVICE] = "services"
+	kindVersionMap[SERVICE] = "api/v1"
+	compositionMap[SERVICE] = []string{}
 }
 
 func CollectProvenance() {
 	fmt.Println("Inside CollectProvenance")
 	for {
+		fmt.Println("==================================================")
 		readKindCompositionFile()
 		provenanceToPrint := false
 		resourceKindList := getResourceKinds()
@@ -101,27 +139,182 @@ func (cp *ClusterProvenance) checkIfProvenanceNeeded(resourceKind, resourceName 
 
 func readKindCompositionFile() {
 	// read from the opt file
-    filePath := os.Getenv("KIND_COMPOSITION_FILE")
-    yamlFile, err := ioutil.ReadFile(filePath)
-    if err != nil {
-    	fmt.Printf("Error reading file:%s", err)
-    }
+    filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
+    if ok {
+	    yamlFile, err := ioutil.ReadFile(filePath)
+    	if err != nil {
+    		fmt.Printf("Error reading file:%s", err)
+    	}
 
-    compositionsList := make([]composition,0)
-    err = yaml.Unmarshal(yamlFile, &compositionsList)
+	    compositionsList := make([]composition,0)
+    	err = yaml.Unmarshal(yamlFile, &compositionsList)
 
-    for _, compositionObj := range compositionsList {
-    	kind := compositionObj.Kind
-    	endpoint := compositionObj.Endpoint
-    	composition := compositionObj.Composition
-    	plural := compositionObj.Plural
-    	//fmt.Printf("Kind:%s, Plural: %s Endpoint:%s, Composition:%s\n", kind, plural, endpoint, composition)
+	    for _, compositionObj := range compositionsList {
+    		kind := compositionObj.Kind
+    		endpoint := compositionObj.Endpoint
+    		composition := compositionObj.Composition
+    		plural := compositionObj.Plural
+    		//fmt.Printf("Kind:%s, Plural: %s Endpoint:%s, Composition:%s\n", kind, plural, endpoint, composition)
 
-    	KindPluralMap[kind] = plural
-    	kindVersionMap[kind] = endpoint
-    	compositionMap[kind] = composition
+    		KindPluralMap[kind] = plural
+    		kindVersionMap[kind] = endpoint
+    		compositionMap[kind] = composition
+    	}
+    } else {
+    	// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
+    	// 1. Query CRDs from etcd
+    	fmt.Println("KIND_COMPOSITION_FILE not provided")
+    	crdListString := queryETCD("/operators")
+    	fmt.Printf("crdListString:%s\n", crdListString)
+    	if crdListString != "" {
+	    	crdNameList := getCRDNames(crdListString)
+    		fmt.Printf("CRDNameList:%v\n", crdNameList)
+
+    		for _, crdName := range crdNameList {
+    			crdDetailsString := queryETCD("/" + crdName)
+    			kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
+
+	    		KindPluralMap[kind] = plural
+    			kindVersionMap[kind] = endpoint
+    			compositionMap[kind] = composition
+    		}
+    	}
     }
     //printMaps()
+}
+
+func getCRDNames(crdListString string) []string {
+	var operatorMapList []map[string]map[string]interface{}
+	var operatorDataMap map[string]interface{}
+
+	if err := json.Unmarshal([]byte(crdListString), &operatorMapList); err != nil {
+        //panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+    }
+    fmt.Printf("OperatorMapList:%v\n", operatorMapList)
+
+    var crdNameList []string = make([]string, 0)
+    for _, operator := range operatorMapList {
+    	operatorDataMap = operator["Operator"]
+
+    	opName := operatorDataMap["Name"]
+    	customResources := operatorDataMap["CustomResources"]
+    	configMapName := operatorDataMap["ConfigMapName"]
+
+    	fmt.Printf("Operator Name:%s\n", opName)
+    	fmt.Printf("ConfigMapName:%s\n", configMapName)
+
+    	for _, cr := range customResources.([]interface{}) {
+    		fmt.Printf("Custom Resource:%s\n", cr)
+    		crdNameList = append(crdNameList, cr.(string))
+    	}
+    }
+    return crdNameList
+}
+
+func getCRDDetails(crdDetailsString string) (string, string, string, []string) {
+
+	var crdDetailsMap = make(map[string]interface{})
+	kind := ""
+	plural := ""
+	endpoint := ""
+	composition := make([]string, 0)
+
+	if err := json.Unmarshal([]byte(crdDetailsString), &crdDetailsMap); err != nil {
+        //panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+    }
+    fmt.Printf("CRDDetailsMap:%v\n", crdDetailsMap)
+
+    kind = crdDetailsMap["kind"].(string)
+    endpoint = crdDetailsMap["endpoint"].(string)
+    plural = crdDetailsMap["plural"].(string)
+    compositionString := crdDetailsMap["composition"].(string)
+    composition1 := strings.Split(compositionString, ",")
+    for _, elem := range composition1 {
+    	elem = strings.TrimSpace(elem)
+    	composition = append(composition, elem)
+    }
+
+	return kind, plural, endpoint, composition
+}
+
+func GetOpenAPISpec(customResourceKind string) string {
+	fmt.Println("Entering getOpenAPISpec")
+
+	// 1. Get ConfigMap Name by querying etcd at
+	resourceKey := "/" + customResourceKind + "-OpenAPISpecConfigMap"
+	configMapNameString := queryETCD(resourceKey)
+
+	var configMapName string
+	if err := json.Unmarshal([]byte(configMapNameString), &configMapName); err != nil {
+        //panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+    }
+    fmt.Printf("ConfigMapName:%v\n", configMapName)
+
+
+	// 2. Query ConfigMap
+	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
+	if err != nil {
+		//glog.Fatalf("Error building kubeconfig: %s", err.Error())
+		//panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+	}
+
+	kubeClient, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		//glog.Fatalf("Error building kubernetes clientset: %s", err.Error())
+		//panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+	}
+
+	configMap, err := kubeClient.CoreV1().ConfigMaps("default").Get(configMapName, metav1.GetOptions{})
+
+	if err != nil {
+		//panic(err)
+		fmt.Printf("Error:%s\n", err.Error())
+	}
+
+	fmt.Println("ConfigMap:%v", configMap)
+
+	configMapData := configMap.Data
+	openAPISpec := configMapData["openapispec"]
+
+	fmt.Printf("OpenAPISpec:%s\n", openAPISpec)
+
+	fmt.Println("Exiting getOpenAPISpec")
+
+	return openAPISpec
+}
+
+
+func queryETCD(resourceKey string) string {
+	fmt.Println("Inside queryETCD")
+	cfg := client.Config{
+		Endpoints: []string{etcdServiceURL},
+		Transport: client.DefaultTransport,
+	}
+	c, err := client.New(cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	kapi := client.NewKeysAPI(c)
+
+	fmt.Printf("Getting value for %s\n", resourceKey)
+	resp, err1 := kapi.Get(context.Background(), resourceKey, nil)
+	if err1 != nil {
+		//log.Fatal(err1)
+		fmt.Printf("Error:%s\n", err1.Error())
+	} else {
+		// print common key info
+		log.Printf("Get is done. Metadata is %q\n", resp)
+		// print value
+		log.Printf("%q key has %q value\n", resp.Node.Key, resp.Node.Value)
+		return resp.Node.Value
+	}
+	fmt.Println("Exiting queryETCD")
+	return ""
 }
 
 func printMaps() {
@@ -223,19 +416,30 @@ func (cp *ClusterProvenance) GetProvenance(resourceKind, resourceName string) st
 	var provenanceBytes []byte
 	var provenanceString string
 	compositions := []Composition{}
-	//fmt.Println("Provenance of different Kinds in this Cluster")
+
+	resourceKindPlural := KindPluralMap[resourceKind]
+
+	fmt.Println("Provenance of different Kinds in this Cluster")
+	fmt.Printf("Kind:%s, Name:%s\n", resourceKindPlural, resourceName)
 	for _, provenanceItem := range cp.clusterProvenance {
 		kind := strings.ToLower(provenanceItem.Kind)
 		name := strings.ToLower(provenanceItem.Name)
 		status := provenanceItem.Status
 		compositionTree := provenanceItem.CompositionTree
-		resourceKind := strings.ToLower(resourceKind)
+		resourceKindPlural := strings.ToLower(resourceKindPlural)
 		//TODO(devdattakulkarni): Make route registration and provenance keyed info
 		//to use same kind name (plural). Currently Provenance info is keyed on
 		//singular kind names. For now, trimming the 's' at the end
-		resourceKind = strings.TrimSuffix(resourceKind, "s") 
+		//resourceKind = strings.TrimSuffix(resourceKind, "s") 
+		var resourceKind string
+		for key, value := range KindPluralMap {
+			if strings.ToLower(value) == strings.ToLower(resourceKindPlural) {
+				resourceKind = strings.ToLower(key)
+				break
+			}
+		}
 		resourceName := strings.ToLower(resourceName)
-		//fmt.Printf("Kind:%s, Kind:%s, Name:%s, Name:%s\n", kind, resourceKind, name, resourceName)
+		fmt.Printf("Kind:%s, Kind:%s, Name:%s, Name:%s\n", kind, resourceKind, name, resourceName)
 		if resourceName == "*" {
 			if resourceKind == kind {
 				composition := getComposition(kind, name, status, compositionTree)

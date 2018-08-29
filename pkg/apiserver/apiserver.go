@@ -119,7 +119,82 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 
 	installCompositionWebService(s)
 
+	installExplainDescribePaths(s)
+
+	//installExplainAlternate(s)
+
 	return s, nil
+}
+
+func installExplainAlternate(discoveryServer *DiscoveryServer) {
+
+	path := "/apis/" + GroupName + "/" + GroupVersion
+	
+	explainPath := path + "/explain"
+	fmt.Printf("Explain PATH:%s\n", explainPath)
+	//ws1 := getWebService()
+	ws1 := new(restful.WebService)
+	ws1.Path(explainPath).
+		Consumes(restful.MIME_JSON, restful.MIME_XML).
+		Produces(restful.MIME_JSON, restful.MIME_XML)
+	ws1.Route(ws1.GET(explainPath).To(handleExplain))
+	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+
+}
+
+func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
+
+	//path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/" + discovery.Namespace
+
+	path := "/apis/" + GroupName + "/" + GroupVersion
+	
+	explainPath := path + "/explain"
+	fmt.Printf("Explain PATH:%s\n", explainPath)
+	ws1 := getWebService()
+	//ws1 := new(restful.WebService)
+	ws1.Path(path).
+		Consumes(restful.MIME_JSON, restful.MIME_XML).
+		Produces(restful.MIME_JSON, restful.MIME_XML)
+
+	ws1.Route(ws1.GET("/explain").To(handleExplain))
+	//discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+
+	//describePath := path + "/describe"
+	//fmt.Printf("Describe PATH:%s\n", describePath)
+	//ws2 := getWebService()
+	//ws2 := new(restful.WebService)
+	//ws2.Path(path).
+	//	Consumes(restful.MIME_JSON, restful.MIME_XML).
+	//	Produces(restful.MIME_JSON, restful.MIME_XML)
+	ws1.Route(ws1.GET("/describe").To(handleDescribe))
+	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+}
+
+func handleExplain(request *restful.Request, response *restful.Response) {
+	fmt.Println("Entering handleExplain")
+
+	customResourceKind := request.QueryParameter("cr")
+	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
+
+	fmt.Println("OpenAPI Spec:%v", openAPISpec)
+
+	response.Write([]byte(openAPISpec))
+
+	fmt.Println("Exiting handleExplain")
+}
+
+func handleDescribe(request *restful.Request, response *restful.Response) {
+	fmt.Println("Entering handleDescribe")
+
+	customResourceKind := request.QueryParameter("cr")
+	customResourceInstance := request.QueryParameter("instance")
+
+	describeInfo := discovery.TotalClusterProvenance.GetProvenance(customResourceKind, customResourceInstance)
+	fmt.Println("Provenance Info:%v", describeInfo)
+
+	response.Write([]byte(describeInfo))
+
+	fmt.Println("Exiting handleDescribe")
 }
 
 func installCompositionWebService(discoveryServer *DiscoveryServer) {
@@ -148,9 +223,12 @@ func getWebService() *restful.WebService {
 }
 
 func getCompositions(request *restful.Request, response *restful.Response) {
+	fmt.Println("Inside getCompositions")
 	resourceName := request.PathParameter("resource-id")
 	requestPath := request.Request.URL.Path
-	//fmt.Printf("Printing Provenance\n")
+	fmt.Printf("Printing Provenance\n")
+	fmt.Printf("Resource Name:%s\n", resourceName)
+	fmt.Printf("Request Path:%s\n", requestPath)
 	//provenance.TotalClusterProvenance.PrintProvenance()
 
 	// Path looks as follows:
@@ -158,6 +236,7 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	resourcePathSlice := strings.Split(requestPath, "/")
 	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
 	provenanceInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceName)
+	fmt.Println("Provenance Info:%v", provenanceInfo)
 
 	response.Write([]byte(provenanceInfo))
 }
