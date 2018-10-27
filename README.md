@@ -86,7 +86,7 @@ Once the kubediscovery API server is running, you can find the dynamic compositi
 kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-deployments.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-dep.png)
 
 
 2) Get dynamic composition for a particular deployment
