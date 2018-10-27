@@ -72,9 +72,9 @@ Scripts are provided to help with building the API server container image and de
 
    `$ ./deploy-discovery-artifacts.sh`
 
-4) Clean-up:
+4) Deploy Nginx Pod:
 
-    `$ ./delete-discovery-artifacts.sh`
+   `$ kubectl apply -f https://k8s.io/examples/application/deployment.yaml`
 
 
 Once the kubediscovery API server is running, you can find the dynamic composition information by using following type of commands:
@@ -83,7 +83,7 @@ Once the kubediscovery API server is running, you can find the dynamic compositi
 1) Get dynamic composition for all deployments
 
 ```
-kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
+kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-deployments.png)
@@ -92,16 +92,16 @@ kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployme
 2) Get dynamic composition for a particular deployment
 
 ```
-kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/<dep-name>/compositions | python -mjson.tool
+kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/deployments/<dep-name>/compositions | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/single-deployment.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx-deployment.png)
 
 
 3) Get dynamic composition of all etcdclusters custom resource (if etcdclusters custom resource is registered in the cluster)
 
 ```
-kubectl get --raw /apis/kubediscovery.cloudark.io/v1/namespaces/default/etcdclusters/*/compositions | python -mjson.tool
+kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/etcdclusters/*/compositions | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/etcd-clusters.png)
@@ -119,6 +119,12 @@ You can use above style of commands with all the Kinds that you have defined in 
    For example:
 
    `$ kubectl logs -n discovery kube-discovery-apiserver-kjz7p  -c kube-discovery-apiserver`
+
+
+### Clean-up:
+
+  `$ ./delete-discovery-artifacts.sh`
+
 
 
 ### Issues/Suggestions:

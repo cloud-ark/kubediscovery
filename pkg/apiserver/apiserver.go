@@ -17,7 +17,7 @@ import (
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 )
 
-const GroupName = "kubediscovery.cloudark.io"
+const GroupName = "kubeplus.cloudark.io"
 const GroupVersion = "v1"
 
 var (
@@ -58,7 +58,7 @@ func init() {
 	)
 
 	// Start collecting provenance
-	go discovery.CollectProvenance()
+	go discovery.BuildCompositionTree()
 }
 
 type ExtraConfig struct {
@@ -226,7 +226,7 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	fmt.Println("Inside getCompositions")
 	resourceName := request.PathParameter("resource-id")
 	requestPath := request.Request.URL.Path
-	fmt.Printf("Printing Provenance\n")
+	fmt.Printf("Printing Composition\n")
 	fmt.Printf("Resource Name:%s\n", resourceName)
 	fmt.Printf("Request Path:%s\n", requestPath)
 	//provenance.TotalClusterProvenance.PrintProvenance()
@@ -235,6 +235,7 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
 	resourcePathSlice := strings.Split(requestPath, "/")
 	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
+	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
 	provenanceInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceName)
 	fmt.Println("Provenance Info:%v", provenanceInfo)
 

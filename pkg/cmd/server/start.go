@@ -13,7 +13,7 @@ import (
 	"github.com/cloud-ark/kubediscovery/pkg/apiserver"
 )
 
-const defaultEtcdPathPrefix = "/registry/kubediscovery.clouarark.io"
+const defaultEtcdPathPrefix = "/registry/kubeplus.cloudark.io"
 
 type DiscoveryServerOptions struct {
 	RecommendedOptions *genericoptions.RecommendedOptions
