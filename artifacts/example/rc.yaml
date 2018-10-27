@@ -17,8 +17,8 @@ spec:
       serviceAccountName: apiserver
       containers:
       - name: kube-discovery-apiserver
-        image: kube-discovery-apiserver:latest
-        imagePullPolicy: Never
+        image: lmecld/kube-discovery-apiserver:latest
+        imagePullPolicy: IfNotPresent
         command: [ "/kube-discovery-apiserver", "--etcd-servers=http://localhost:2379" ]
         volumeMounts:
         - name: kind-compositions-volume
