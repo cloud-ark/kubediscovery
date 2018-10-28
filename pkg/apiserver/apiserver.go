@@ -117,9 +117,11 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 		return nil, err
 	}
 
-	installCompositionWebService(s)
-
 	installExplainDescribePaths(s)
+
+	// Turning off registration of '/compositions' endpoints. We should use /describe endpoint	      // that supports query parameters for 'kind' and 'instance'.
+	// The installExplainDescribePaths function registers the /describe endpoint.
+	//installCompositionWebService(s)
 
 	//installExplainAlternate(s)
 
@@ -186,11 +188,28 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 func handleDescribe(request *restful.Request, response *restful.Response) {
 	fmt.Println("Entering handleDescribe")
 
-	customResourceKind := request.QueryParameter("cr")
-	customResourceInstance := request.QueryParameter("instance")
+	resourceKind := request.QueryParameter("kind")
+	resourceInstance := request.QueryParameter("instance")
 
-	describeInfo := discovery.TotalClusterProvenance.GetProvenance(customResourceKind, customResourceInstance)
-	fmt.Println("Provenance Info:%v", describeInfo)
+	/*
+	Note: We cannot generically convert kind to 'first letter capital' form
+	as there are Kinds like ReplicaSet in which the middle s needs to be 'S'
+	and not 's'. So commenting out below. So we are going to require providing
+        the exact Kind name such as: Pod, Deployment, Postgres, etc.
+	Also note that we are going to require input as singular Kind Name and not
+	plural (as we had with the compositions endpoint)
+	resourceKind = strings.ToLower(resourceKind)
+	parts := strings.Split(resourceKind, "")
+	firstPart := string(parts[0])
+	firstPart = strings.ToUpper(firstPart)
+	secondPart := strings.Join(parts[1:], "")
+	resourceKind = firstPart + secondPart
+	*/
+
+	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance) 
+
+	describeInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceInstance)
+	fmt.Printf("Composition:%v\n", describeInfo)
 
 	response.Write([]byte(describeInfo))
 
