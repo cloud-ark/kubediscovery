@@ -1,38 +1,47 @@
 # kubediscovery
 
-A Kubernetes Aggregated API Server that helps with discovery of dynamic information about your cluster.
+A Kubernetes Aggregated API Server to retrieve dynamic composition tree of Kubernetes resources/kinds in your cluster.
 
 
 ## What is it?
 
-kubediscovery is a tool that helps you find dynamic composition tree of Kubernetes Objects. 
-In Kubernetes there are top-level resources which are composed of other resources. 
+kubediscovery is a tool that helps you find dynamic composition trees of Kubernetes Objects.
+In Kubernetes there are top-level resources which are composed of other resources.
 For example, a Deployment is composed of a ReplicaSet which in turn is composed of one or more Pods. 
-kubediscovery is a Kubernetes Aggregated API Server that helps you find composition trees of Kubernetes objects.
+kubediscovery is a Kubernetes Aggregated API Server that helps you find 
+the entire composition trees of Kubernetes objects in your cluster.
 
 
-## How does it work?
+## How it works?
 
-You provide it a YAML file that defines static composition relationship between different Resources/Kinds.
-Using this information kubediscovery API Server builds the dynamic composition information by 
-continuously querying the Kubernetes API for various Objects of different Kinds that are created in your cluster.
+You provide a YAML file that defines static composition relationship between different Resources/Kinds.
+Using this information kubediscovery API Server builds the dynamic composition trees by 
+continuously querying the Kubernetes API for various Objects that are created in your cluster.
 
 The YAML file can contain both in-built Kinds (such as Deployment, Pod, Service), and
-Custom Resource Kinds (such as EtcdCluster).
-kubedsicovery API server registers REST endpoints for all the kinds that are defined in the YAML file.
-These endpoints will be accessed by `kubectl get` command when you want to retrieve the dynamic
-composition information (see examples below). An example YAML file is provided (kind_compositions.yaml).
-There is also kind_compositions.yaml.with-etcd which shows definition for the EtcdCluster custom resource.
-Use this YAML only after you deploy the [Etcd Operator](https://github.com/coreos/etcd-operator)
-(Rename this file to kind_compositions.yaml before deploying the API server).
+Custom Resource Kinds (such as Postgres or EtcdCluster). An example YAML file is provided (kind_compositions.yaml). There is also kind_compositions.yaml.with-etcd which shows definition for the EtcdCluster custom resource. Use this YAML only after you deploy the [Etcd Operator](https://github.com/coreos/etcd-operator) (Rename this file to kind_compositions.yaml before deploying the API server).
 
-The dynamic composition information is currently collected for the "default" namespace.
-It is stored in memory. In the future we will store it in the Etcd instance that we run along with
-the API server. We use OwnerReferences to build the dynamic composition tree for Objects.
-For querying the main API server, we use direct REST calls instead of typed clients. 
-This is done because we want to be able to query for Objects 
-based on what is defined in kind_compositions.yaml, which we won't know in advance.
-So we cannot use typed clients inside kubediscovery to query the main API server to build the dynamic composition tree.
+kubedsicovery API server registers following REST endpoint in your cluster:
+`/apis/kubeplus.cloudark.io/v1/describe`
+
+kubediscovery supports two query parameters: `kind` and `instance` on this endpoint.
+
+To retrieve dynamic composition tree for a particular Kind you would use following call:
+
+```kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=nginx-deployment```
+
+The value for `kind` query parameter should be the exact name of a Kind such as 'Deployment' and not 'deployment' or 'deployments'.
+
+The value for `instance` query parameter should be the name of the instance. 
+A special value of `*` is supported for the `instance` query parameter to retrieve 
+composition trees for all instances of a particular Kind.
+
+The dynamic composition information is currently collected for the "default" namespace only.
+The work to support all namespaces is being tracked [here](https://github.com/cloud-ark/kubediscovery/issues/16).
+
+Constructed dynamic composition trees are currently stored in memory.
+If the kubediscovery pod is deleted this information will be lost.
+But it will be recreated once you redeploy kubediscovery API Server.
 
 In building this API server we tried several approaches. You can read about our experience  
 [here](https://medium.com/@cloudark/our-journey-in-building-a-kubernetes-aggregated-api-server-29a4f9c1de22).
@@ -44,69 +53,106 @@ In building this API server we tried several approaches. You can read about our 
 kubectl get all
 ```
 
-1) Using kubediscovery you can find out composition tree of specific Kinds.
+1) Using kubediscovery you can find dynamic composition trees for native Kinds and Custom Resources alike.
 
-2) You can find composition trees of all objects or a specific object of a particular Kind.
-
-3) Works with Custom Resources.
+2) You can find dynamic composition trees for a specific object or all objects of a particular Kind.
 
 
-## Try it on Minikube
+## Try it:
 
+Download Minikube
+- You will need VirtualBox installed
+- Download appropriate version of Minikube for your platform
+- Kubediscovery has been tested with Minikube-0.25 and Minikube-0.28.
+  It should work with other versions as well. Please file an Issue if it does not.
 
-Scripts are provided to help with building the API server container image and deployment/cleanup.
+1) Start Minikube
 
-0) Allow Minikube to use local Docker images: 
-
-   `$ eval $(minikube docker-env)`
-
-1) Install/Vendor in dependencies:
-
-   `$ dep ensure`
-
-2) Build the API Server container image:
-
-   `$ ./build-discovery-artifacts.sh`
-
-3) Deploy the API Server in your cluster:
+2) Deploy the API Server in your cluster:
 
    `$ ./deploy-discovery-artifacts.sh`
 
+3) Check that API Server is running:
+
+   `$ kubectl get pods -n discovery`    
+
 4) Deploy Nginx Pod:
 
-   `$ kubectl apply -f https://k8s.io/examples/application/deployment.yaml`
+   `$ kubectl apply -f nginx-deployment.yaml`
 
 
-Once the kubediscovery API server is running, you can find the dynamic composition information by using following type of commands:
-
-
-1) Get dynamic composition for all deployments
+5) Get dynamic composition for nginx deployment
 
 ```
-kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/deployments/*/compositions | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=nginx1-deployment" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-dep.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx1-deployment.png)
 
 
-2) Get dynamic composition for a particular deployment
-
-```
-kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/deployments/<dep-name>/compositions | python -mjson.tool
-```
-
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx-deployment.png)
-
-
-3) Get dynamic composition of all etcdclusters custom resource (if etcdclusters custom resource is registered in the cluster)
+6) Get dynamic composition for all deployments
 
 ```
-kubectl get --raw /apis/kubeplus.cloudark.io/v1/namespaces/default/etcdclusters/*/compositions | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=*" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/etcd-clusters.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-dep-1.png)
+
+
+7) Get dynamic composition for all replicasets
+
+```
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=ReplicaSet&instance=*" | python -mjson.tool
+```
+
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-replicasets.png)
+
+
+8) Get dynamic composition for all pods
+
+```
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Pod&instance=*" | python -mjson.tool
+```
+
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-pod.png)
+
+
+9) Delete nginx deployment
+
+```
+kubectl delete -f nginx-deployment.yaml
+```
+
+10) Try getting dynamic compositions for various kinds again (repeat steps 5-8)
+
 
 You can use above style of commands with all the Kinds that you have defined in kind_compositions.yaml
+
+
+
+## Development
+
+1) Start Minikube 
+
+2) Allow Minikube to use local Docker images: 
+
+   `$ eval $(minikube docker-env)`
+
+3) Install/Vendor in dependencies:
+
+   `$ dep ensure`
+
+4) Build the API Server container image:
+
+   `$ ./build-local-discovery-artifacts.sh`
+
+5) Deploy the API Server in your cluster:
+
+   `$ ./deploy-local-discovery-artifacts.sh`
+
+6) Follow steps 3-10 listed under Try it section above.
+
+
 
 
 ## Troubleshooting tips:
@@ -129,12 +175,8 @@ You can use above style of commands with all the Kinds that you have defined in 
 
 ### Issues/Suggestions:
 
-Issues and suggestions for improvement are welcome. Please file them [here](https://github.com/cloud-ark/kubediscovery/issues)
+Issues and suggestions for improvement are welcome. 
+Please file them [here](https://github.com/cloud-ark/kubediscovery/issues)
 
-
-### References:
-
-The Aggregated API Server has been developed by refering to [sample-apiserver](https://github.com/kubernetes/sample-apiserver)
-and [custom-metrics-apiserver](https://github.com/kubernetes-incubator/custom-metrics-apiserver).
 
 
