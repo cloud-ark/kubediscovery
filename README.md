@@ -125,8 +125,20 @@ kubectl delete -f nginx-deployment.yaml
 
 10) Try getting dynamic compositions for various kinds again (repeat steps 5-8)
 
-
 You can use above style of commands with all the Kinds that you have defined in kind_compositions.yaml
+
+
+
+11) Get Postgres composition
+
+This will work only after you have deployed Postgres Operator. 
+Follow [these steps](https://github.com/cloud-ark/kubeplus/blob/master/kubeplus-steps.txt) to deploy Postgres Operator.
+
+```
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Postgres&instance=postgres1" | python -mjson.tool
+```
+
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/postgres.png)
 
 
 
