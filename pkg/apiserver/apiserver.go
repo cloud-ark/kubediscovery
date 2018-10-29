@@ -19,6 +19,8 @@ import (
 
 const GroupName = "kubeplus.cloudark.io"
 const GroupVersion = "v1"
+const KIND_QUERY_PARAM = "kind"
+const INSTANCE_QUERY_PARAM = "instance"
 
 var (
 	Scheme = runtime.NewScheme()
@@ -175,7 +177,9 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 func handleExplain(request *restful.Request, response *restful.Response) {
 	fmt.Println("Entering handleExplain")
 
-	customResourceKind := request.QueryParameter("cr")
+	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	fmt.Printf("Kind:%s\n", customResourceKind)
+
 	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
 
 	fmt.Println("OpenAPI Spec:%v", openAPISpec)
@@ -188,8 +192,8 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 func handleDescribe(request *restful.Request, response *restful.Response) {
 	fmt.Println("Entering handleDescribe")
 
-	resourceKind := request.QueryParameter("kind")
-	resourceInstance := request.QueryParameter("instance")
+	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
 
 	/*
 	Note: We cannot generically convert kind to 'first letter capital' form
