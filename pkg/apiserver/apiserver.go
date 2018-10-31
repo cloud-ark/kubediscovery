@@ -170,7 +170,7 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 	//ws2.Path(path).
 	//	Consumes(restful.MIME_JSON, restful.MIME_XML).
 	//	Produces(restful.MIME_JSON, restful.MIME_XML)
-	ws1.Route(ws1.GET("/describe").To(handleDescribe))
+	ws1.Route(ws1.GET("/composition").To(handleComposition))
 	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
 }
 
@@ -189,8 +189,8 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 	fmt.Println("Exiting handleExplain")
 }
 
-func handleDescribe(request *restful.Request, response *restful.Response) {
-	fmt.Println("Entering handleDescribe")
+func handleComposition(request *restful.Request, response *restful.Response) {
+	fmt.Println("Entering handleComposition")
 
 	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
@@ -217,7 +217,7 @@ func handleDescribe(request *restful.Request, response *restful.Response) {
 
 	response.Write([]byte(describeInfo))
 
-	fmt.Println("Exiting handleDescribe")
+	fmt.Println("Exiting handleComposition")
 }
 
 func installCompositionWebService(discoveryServer *DiscoveryServer) {
