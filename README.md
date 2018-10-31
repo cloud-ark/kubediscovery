@@ -81,10 +81,10 @@ Download Minikube
    `$ kubectl apply -f nginx-deployment.yaml`
 
 
-5) Get dynamic composition for nginx deployment
+5) Get dynamic composition for all deployments
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=nginx1-deployment" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=*" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx-deployment-composition.png)
