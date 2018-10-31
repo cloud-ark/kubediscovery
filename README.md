@@ -22,13 +22,13 @@ The YAML file can contain both in-built Kinds (such as Deployment, Pod, Service)
 Custom Resource Kinds (such as Postgres or EtcdCluster). An example YAML file is provided (kind_compositions.yaml). There is also kind_compositions.yaml.with-etcd which shows definition for the EtcdCluster custom resource. Use this YAML only after you deploy the [Etcd Operator](https://github.com/coreos/etcd-operator) (Rename this file to kind_compositions.yaml before deploying the API server).
 
 kubedsicovery API server registers following REST endpoint in your cluster:
-`/apis/kubeplus.cloudark.io/v1/describe`
+`/apis/kubeplus.cloudark.io/v1/composition`
 
 kubediscovery supports two query parameters: `kind` and `instance` on this endpoint.
 
 To retrieve dynamic composition tree for a particular Kind you would use following call:
 
-```kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=nginx-deployment```
+```kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=nginx-deployment```
 
 The value for `kind` query parameter should be the exact name of a Kind such as 'Deployment' and not 'deployment' or 'deployments'.
 
@@ -84,7 +84,7 @@ Download Minikube
 5) Get dynamic composition for nginx deployment
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=nginx1-deployment" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=nginx1-deployment" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx1-deployment.png)
@@ -93,7 +93,7 @@ kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instan
 6) Get dynamic composition for all deployments
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instance=*" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=*" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-dep-1.png)
@@ -102,7 +102,7 @@ kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Deployment&instan
 7) Get dynamic composition for all replicasets
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=ReplicaSet&instance=*" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=ReplicaSet&instance=*" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-replicasets.png)
@@ -111,7 +111,7 @@ kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=ReplicaSet&instan
 8) Get dynamic composition for all pods
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Pod&instance=*" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Pod&instance=*" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-pod.png)
@@ -135,7 +135,7 @@ This will work only after you have deployed Postgres Operator.
 Follow [these steps](https://github.com/cloud-ark/kubeplus/blob/master/kubeplus-steps.txt) to deploy Postgres Operator.
 
 ```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/describe?kind=Postgres&instance=postgres1" | python -mjson.tool
+kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Postgres&instance=postgres1" | python -mjson.tool
 ```
 
 ![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/postgres.png)
