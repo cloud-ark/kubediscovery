@@ -87,49 +87,41 @@ Download Minikube
 kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=nginx1-deployment" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx1-deployment.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/nginx-deployment-composition.png)
 
 
-6) Get dynamic composition for all deployments
 
-```
-kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Deployment&instance=*" | python -mjson.tool
-```
-
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-dep-1.png)
-
-
-7) Get dynamic composition for all replicasets
+6) Get dynamic composition for all replicasets
 
 ```
 kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=ReplicaSet&instance=*" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-replicasets.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/replicaset-composition.png)
 
 
-8) Get dynamic composition for all pods
+7) Get dynamic composition for all pods
 
 ```
 kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Pod&instance=*" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-pod.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/all-pod-composition.png)
 
 
-9) Delete nginx deployment
+8) Delete nginx deployment
 
 ```
 kubectl delete -f nginx-deployment.yaml
 ```
 
-10) Try getting dynamic compositions for various kinds again (repeat steps 5-8)
+9) Try getting dynamic compositions for various kinds again (repeat steps 5-7)
 
 You can use above style of commands with all the Kinds that you have defined in kind_compositions.yaml
 
 
 
-11) Get Postgres composition
+10) Get Postgres composition
 
 This will work only after you have deployed Postgres Operator. 
 Follow [these steps](https://github.com/cloud-ark/kubeplus/blob/master/kubeplus-steps.txt) to deploy Postgres Operator.
@@ -138,7 +130,7 @@ Follow [these steps](https://github.com/cloud-ark/kubeplus/blob/master/kubeplus-
 kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Postgres&instance=postgres1" | python -mjson.tool
 ```
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/postgres.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/postgres-composition.png)
 
 
 
