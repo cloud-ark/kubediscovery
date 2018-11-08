@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"encoding/json"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/version"
@@ -180,11 +182,20 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	fmt.Printf("Kind:%s\n", customResourceKind)
 
-	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
+	customResourceKind, queryKind := getQueryKind(customResourceKind)
+	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
+	fmt.Printf("Query Kind:%s\n", queryKind)
 
+	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
 	fmt.Println("OpenAPI Spec:%v", openAPISpec)
 
-	response.Write([]byte(openAPISpec))
+	queryResponse := parseOpenAPISpec([]byte(openAPISpec), queryKind)
+
+	fmt.Printf("Query response:%s\n", queryResponse)
+
+	//response.Write([]byte(openAPISpec))
+
+	response.Write([]byte(queryResponse))
 
 	fmt.Println("Exiting handleExplain")
 }
@@ -263,4 +274,60 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	fmt.Println("Provenance Info:%v", provenanceInfo)
 
 	response.Write([]byte(provenanceInfo))
+}
+
+func getQueryKind(input string) (string, string) {
+
+     // Input can be Postgres.PostgresSpec.UserSpec
+     // Return the last entry (i.e. UserSpec in above example)
+     customResourceKind := ""
+     queryKind := ""
+     
+     parts := strings.Split(input, ".")
+     
+     queryKind = parts[len(parts)-1]
+     customResourceKind = parts[0]
+     
+     /*
+     // In input contains 'Spec' or 'Status' at the end, remove it
+     output := input
+     if strings.Contains(input, "Spec") {
+     	lastIndex := strings.LastIndex(input, "Spec")
+	if lastIndex > -1 {
+	    output = input[0:lastIndex]
+        }
+     } else if strings.Contains(input, "Status") {
+     	lastIndex := strings.LastIndex(input, "Status")
+	if lastIndex > -1 {
+	   output = input[0:lastIndex]
+	}
+     }*/
+
+     return customResourceKind, queryKind
+}
+
+func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
+	var data interface{}
+	retVal := ""
+	err := json.Unmarshal(openAPISpec, &data)
+	if err != nil {
+	   fmt.Printf("Error:%v\n", err)
+	}
+
+	overallMap := data.(map[string]interface{})
+
+	definitionsMap := overallMap["definitions"].(map[string]interface{})
+
+	queryString := "typedir." + customResourceKind
+	resultMap := definitionsMap[queryString]
+
+	result, err1 := json.Marshal(resultMap)
+
+	if err1 != nil {
+	   fmt.Printf("Error:%v\n", err1)
+	}
+
+	retVal = string(result)	
+
+	return retVal
 }
