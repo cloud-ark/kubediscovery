@@ -189,11 +189,11 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
 	fmt.Println("OpenAPI Spec:%v", openAPISpec)
 
-	queryResponse := parseOpenAPISpec([]byte(openAPISpec), queryKind)
-
-	fmt.Printf("Query response:%s\n", queryResponse)
-
-	//response.Write([]byte(openAPISpec))
+	queryResponse := ""
+	if openAPISpec != "" {
+	   queryResponse = parseOpenAPISpec([]byte(openAPISpec), queryKind)
+	   fmt.Printf("Query response:%s\n", queryResponse)
+	}
 
 	response.Write([]byte(queryResponse))
 
@@ -288,21 +288,6 @@ func getQueryKind(input string) (string, string) {
      queryKind = parts[len(parts)-1]
      customResourceKind = parts[0]
      
-     /*
-     // In input contains 'Spec' or 'Status' at the end, remove it
-     output := input
-     if strings.Contains(input, "Spec") {
-     	lastIndex := strings.LastIndex(input, "Spec")
-	if lastIndex > -1 {
-	    output = input[0:lastIndex]
-        }
-     } else if strings.Contains(input, "Status") {
-     	lastIndex := strings.LastIndex(input, "Status")
-	if lastIndex > -1 {
-	   output = input[0:lastIndex]
-	}
-     }*/
-
      return customResourceKind, queryKind
 }
 
