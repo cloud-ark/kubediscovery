@@ -305,7 +305,6 @@ func GetOpenAPISpec(customResourceKind string) string {
 }
 
 func queryETCD(resourceKey string) string {
-	fmt.Println("Inside queryETCD")
 	cfg := client.Config{
 		Endpoints: []string{etcdServiceURL},
 		Transport: client.DefaultTransport,
@@ -328,7 +327,6 @@ func queryETCD(resourceKey string) string {
 		log.Printf("%q key has %q value\n", resp.Node.Key, resp.Node.Value)
 		return resp.Node.Value
 	}
-	fmt.Println("Exiting queryETCD")
 	return ""
 }
 
