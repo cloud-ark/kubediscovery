@@ -177,8 +177,6 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 }
 
 func handleExplain(request *restful.Request, response *restful.Response) {
-	fmt.Println("Entering handleExplain")
-
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	fmt.Printf("Kind:%s\n", customResourceKind)
 
@@ -196,12 +194,9 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 	}
 
 	response.Write([]byte(queryResponse))
-
-	fmt.Println("Exiting handleExplain")
 }
 
 func handleComposition(request *restful.Request, response *restful.Response) {
-	fmt.Println("Entering handleComposition")
 
 	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
@@ -227,8 +222,6 @@ func handleComposition(request *restful.Request, response *restful.Response) {
 	fmt.Printf("Composition:%v\n", describeInfo)
 
 	response.Write([]byte(describeInfo))
-
-	fmt.Println("Exiting handleComposition")
 }
 
 func installCompositionWebService(discoveryServer *DiscoveryServer) {
@@ -257,7 +250,6 @@ func getWebService() *restful.WebService {
 }
 
 func getCompositions(request *restful.Request, response *restful.Response) {
-	fmt.Println("Inside getCompositions")
 	resourceName := request.PathParameter("resource-id")
 	requestPath := request.Request.URL.Path
 	fmt.Printf("Printing Composition\n")
