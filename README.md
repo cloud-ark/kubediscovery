@@ -12,7 +12,7 @@ Current implementation supports following endpoints.
 [/apis/kubeplus.cloudark.io/v1/explain](https://github.com/cloud-ark/kubeplus/blob/master/examples/mysql/steps.txt#L53)
 
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/kubediscovery.jpg)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/kubediscovery.jpg =50x50)
 
 
 Kubediscovery can be used in two ways - standalone or as part of 
