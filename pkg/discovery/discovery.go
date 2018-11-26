@@ -179,12 +179,12 @@ func readKindCompositionFile() {
     } else {
     	// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
     	// 1. Query CRDs from etcd
-    	fmt.Println("KIND_COMPOSITION_FILE not provided")
+    	//fmt.Println("KIND_COMPOSITION_FILE not provided")
     	crdListString := queryETCD("/operators")
-    	fmt.Printf("crdListString:%s\n", crdListString)
+    	//fmt.Printf("crdListString:%s\n", crdListString)
     	if crdListString != "" {
 	    	crdNameList := getCRDNames(crdListString)
-    		fmt.Printf("CRDNameList:%v\n", crdNameList)
+    		//fmt.Printf("CRDNameList:%v\n", crdNameList)
 
     		for _, crdName := range crdNameList {
     			crdDetailsString := queryETCD("/" + crdName)
@@ -207,7 +207,7 @@ func getCRDNames(crdListString string) []string {
         //panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
     }
-    fmt.Printf("OperatorMapList:%v\n", operatorMapList)
+    //fmt.Printf("OperatorMapList:%v\n", operatorMapList)
 
     var crdNameList []string = make([]string, 0)
     for _, operator := range operatorMapList {
@@ -217,11 +217,11 @@ func getCRDNames(crdListString string) []string {
     	customResources := operatorDataMap["CustomResources"]
     	configMapName := operatorDataMap["ConfigMapName"]
 
-    	fmt.Printf("Operator Name:%s\n", opName)
-    	fmt.Printf("ConfigMapName:%s\n", configMapName)
+    	//fmt.Printf("Operator Name:%s\n", opName)
+    	//fmt.Printf("ConfigMapName:%s\n", configMapName)
 
     	for _, cr := range customResources.([]interface{}) {
-    		fmt.Printf("Custom Resource:%s\n", cr)
+    		//fmt.Printf("Custom Resource:%s\n", cr)
     		crdNameList = append(crdNameList, cr.(string))
     	}
     }
@@ -240,7 +240,7 @@ func getCRDDetails(crdDetailsString string) (string, string, string, []string) {
         //panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
     }
-    fmt.Printf("CRDDetailsMap:%v\n", crdDetailsMap)
+    //fmt.Printf("CRDDetailsMap:%v\n", crdDetailsMap)
 
     kind = crdDetailsMap["kind"].(string)
     endpoint = crdDetailsMap["endpoint"].(string)
@@ -319,7 +319,8 @@ func queryETCD(resourceKey string) string {
 	resp, err1 := kapi.Get(context.Background(), resourceKey, nil)
 	if err1 != nil {
 		//log.Fatal(err1)
-		fmt.Printf("Error:%s\n", err1.Error())
+		//fmt.Printf("Error:%s\n", err1.Error())
+		return string(err1.Error())
 	} else {
 		// print common key info
 		log.Printf("Get is done. Metadata is %q\n", resp)
