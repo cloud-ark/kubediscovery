@@ -5,14 +5,14 @@ installing a Custom Resource Definition (CRD) or Kubernetes Operator in the clus
 
 Current implementation supports following endpoints.
 
-* composition - Retrieve dynamic composition tree of Custom Resource instance in terms of the underlying resource instances (e.g. which underlying resource instances are part of the composition tree of a Postgres Custom Resource instance.) 
+* composition - Retrieve dynamic composition tree of Custom Resource instance in terms of the underlying resource instances (e.g. which underlying resource instances are part of the composition tree of a Postgres Custom Resource instance.) - 
 [/apis/kubeplus.cloudark.io/v1/composition](https://github.com/cloud-ark/kubeplus/blob/master/examples/moodle/steps.txt#L71)
 
-* explain - Retrieve OpenAPI Spec for registered Custom Resources. 
+* explain - Retrieve OpenAPI Spec for registered Custom Resources - 
 [/apis/kubeplus.cloudark.io/v1/explain](https://github.com/cloud-ark/kubeplus/blob/master/examples/mysql/steps.txt#L53)
 
 
-![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/kubediscovery.png)
+![alt text](https://github.com/cloud-ark/kubediscovery/raw/master/docs/kubediscovery.jpg)
 
 
 Kubediscovery can be used in two ways - standalone or as part of 
