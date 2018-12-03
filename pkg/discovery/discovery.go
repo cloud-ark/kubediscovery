@@ -1,49 +1,52 @@
 package discovery
 
 import (
+	"context"
+	"crypto/tls"
+	cert "crypto/x509"
 	"encoding/json"
-	"os"
-	"time"
+	"flag"
 	"fmt"
-	"strings"
+	"github.com/coreos/etcd/client"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
-	cert "crypto/x509"
-	"crypto/tls"
-	"context"
-	"gopkg.in/yaml.v2"
-	"github.com/coreos/etcd/client"
-	"flag"
+	"os"
+	"strings"
+	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 var (
-	serviceHost string
-	servicePort string
-	Namespace string
-	httpMethod string
+	serviceHost    string
+	servicePort    string
+	Namespace      string
+	httpMethod     string
 	etcdServiceURL string
 
-	KindPluralMap map[string]string
+	KindPluralMap  map[string]string
 	kindVersionMap map[string]string
 	compositionMap map[string][]string
 
-	REPLICA_SET string
-	DEPLOYMENT string
-	POD string
-	CONFIG_MAP string
-	SERVICE string
+	REPLICA_SET  string
+	DEPLOYMENT   string
+	POD          string
+	CONFIG_MAP   string
+	SERVICE      string
+	SECRET       string
+	PVCLAIM      string
+	PV           string
 	ETCD_CLUSTER string
 )
 
 var (
-	masterURL  string
-	kubeconfig string
+	masterURL   string
+	kubeconfig  string
 	etcdservers string
 )
 
@@ -59,7 +62,6 @@ func init() {
 	Namespace = "default"
 	httpMethod = http.MethodGet
 
-	//etcdServiceURL = "http://example-etcd-cluster-client:2379"
 	etcdServiceURL = "http://localhost:2379"
 
 	DEPLOYMENT = "Deployment"
@@ -67,11 +69,14 @@ func init() {
 	POD = "Pod"
 	CONFIG_MAP = "ConfigMap"
 	SERVICE = "Service"
+	SECRET = "Secret"
+	PVCLAIM = "PersistentVolumeClaim"
+	PV = "PersistentVolume"
 	ETCD_CLUSTER = "EtcdCluster"
 
 	KindPluralMap = make(map[string]string)
 	kindVersionMap = make(map[string]string)
-	compositionMap = make(map[string][]string,0)
+	compositionMap = make(map[string][]string, 0)
 
 	readKindCompositionFile()
 
@@ -91,14 +96,23 @@ func init() {
 	KindPluralMap[SERVICE] = "services"
 	kindVersionMap[SERVICE] = "api/v1"
 	compositionMap[SERVICE] = []string{}
+
+	KindPluralMap[SECRET] = "secrets"
+	kindVersionMap[SECRET] = "api/v1"
+	compositionMap[SECRET] = []string{}
+
+	KindPluralMap[PVCLAIM] = "persistentvolumeclaims"
+	kindVersionMap[PVCLAIM] = "api/v1"
+	compositionMap[PVCLAIM] = []string{}
+
+	KindPluralMap[PV] = "persistentvolumes"
+	kindVersionMap[PV] = "api/v1/persistentvolumes"
+	compositionMap[PV] = []string{}
 }
 
 func BuildCompositionTree() {
-	//fmt.Println("Inside CollectProvenance")
 	for {
-		//fmt.Println("==================================================")
 		readKindCompositionFile()
-		//provenanceToPrint := false
 		resourceKindList := getResourceKinds()
 		resourceInCluster := []MetaDataAndOwnerReferences{}
 		for _, resourceKind := range resourceKindList {
@@ -106,37 +120,29 @@ func BuildCompositionTree() {
 			//fmt.Printf("TopLevelMetaDataOwnerRefList:%v\n", topLevelMetaDataOwnerRefList)
 			for _, topLevelObject := range topLevelMetaDataOwnerRefList {
 				resourceName := topLevelObject.MetaDataName
-				//provenanceNeeded := TotalClusterProvenance.checkIfProvenanceNeeded(resourceKind, resourceName)
-				//if provenanceNeeded {
-					//fmt.Println("###################################")
-					//fmt.Printf("Building Provenance for %s %s\n", resourceKind, resourceName)
-					level := 1
-					compositionTree := []CompositionTreeNode{}
-					buildProvenance(resourceKind, resourceName, level, &compositionTree)
-					//fmt.Printf("CompositionTree:%v\n", compositionTree)
-					TotalClusterProvenance.storeProvenance(topLevelObject, resourceKind, resourceName, &compositionTree)
-					//fmt.Println("###################################\n")
-					//provenanceToPrint = true
-				//}
+
+				level := 1
+				compositionTree := []CompositionTreeNode{}
+				buildProvenance(resourceKind, resourceName, level, &compositionTree)
+				//fmt.Printf("CompositionTree:%v\n", compositionTree)
+				TotalClusterProvenance.storeProvenance(topLevelObject, resourceKind, resourceName, &compositionTree)
 			}
 			for _, resource := range topLevelMetaDataOwnerRefList {
-			    present := false
-			    for _, res := range resourceInCluster {
-			    	if res.MetaDataName == resource.MetaDataName {
-				   present = true
+				present := false
+				for _, res := range resourceInCluster {
+					if res.MetaDataName == resource.MetaDataName {
+						present = true
+					}
 				}
-			    }
-			    if !present {
-			       resourceInCluster = append(resourceInCluster, resource)
-			    }
+				if !present {
+					resourceInCluster = append(resourceInCluster, resource)
+				}
 			}
 		}
 
 		TotalClusterProvenance.purgeCompositionOfDeletedItems(resourceInCluster)
-		//if provenanceToPrint {
-		//	TotalClusterProvenance.PrintProvenance()
-		//}
-		time.Sleep(time.Second * 5)
+
+		time.Sleep(time.Second * 10)
 	}
 }
 
@@ -154,49 +160,45 @@ func (cp *ClusterProvenance) checkIfProvenanceNeeded(resourceKind, resourceName 
 }
 
 func readKindCompositionFile() {
-    // read from the opt file
-    filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
-    if ok {
-	    yamlFile, err := ioutil.ReadFile(filePath)
-    	if err != nil {
-    		fmt.Printf("Error reading file:%s", err)
-    	}
+	// read from the opt file
+	filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
+	if ok {
+		yamlFile, err := ioutil.ReadFile(filePath)
+		if err != nil {
+			fmt.Printf("Error reading file:%s", err)
+		}
 
-	    compositionsList := make([]composition,0)
-    	err = yaml.Unmarshal(yamlFile, &compositionsList)
+		compositionsList := make([]composition, 0)
+		err = yaml.Unmarshal(yamlFile, &compositionsList)
 
-	    for _, compositionObj := range compositionsList {
-    		kind := compositionObj.Kind
-    		endpoint := compositionObj.Endpoint
-    		composition := compositionObj.Composition
-    		plural := compositionObj.Plural
-    		//fmt.Printf("Kind:%s, Plural: %s Endpoint:%s, Composition:%s\n", kind, plural, endpoint, composition)
+		for _, compositionObj := range compositionsList {
+			kind := compositionObj.Kind
+			endpoint := compositionObj.Endpoint
+			composition := compositionObj.Composition
+			plural := compositionObj.Plural
+			//fmt.Printf("Kind:%s, Plural: %s Endpoint:%s, Composition:%s\n", kind, plural, endpoint, composition)
 
-    		KindPluralMap[kind] = plural
-    		kindVersionMap[kind] = endpoint
-    		compositionMap[kind] = composition
-    	}
-    } else {
-    	// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
-    	// 1. Query CRDs from etcd
-    	//fmt.Println("KIND_COMPOSITION_FILE not provided")
-    	crdListString := queryETCD("/operators")
-    	//fmt.Printf("crdListString:%s\n", crdListString)
-    	if crdListString != "" {
-	    	crdNameList := getCRDNames(crdListString)
-    		//fmt.Printf("CRDNameList:%v\n", crdNameList)
+			KindPluralMap[kind] = plural
+			kindVersionMap[kind] = endpoint
+			compositionMap[kind] = composition
+		}
+	} else {
+		// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
+		crdListString := queryETCD("/operators")
+		if crdListString != "" {
+			crdNameList := getCRDNames(crdListString)
 
-    		for _, crdName := range crdNameList {
-    			crdDetailsString := queryETCD("/" + crdName)
-    			kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
+			for _, crdName := range crdNameList {
+				crdDetailsString := queryETCD("/" + crdName)
+				kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
 
-	    		KindPluralMap[kind] = plural
-    			kindVersionMap[kind] = endpoint
-    			compositionMap[kind] = composition
-    		}
-    	}
-    }
-    //printMaps()
+				KindPluralMap[kind] = plural
+				kindVersionMap[kind] = endpoint
+				compositionMap[kind] = composition
+			}
+		}
+	}
+	//printMaps()
 }
 
 func getCRDNames(crdListString string) []string {
@@ -204,28 +206,20 @@ func getCRDNames(crdListString string) []string {
 	var operatorDataMap map[string]interface{}
 
 	if err := json.Unmarshal([]byte(crdListString), &operatorMapList); err != nil {
-        //panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
-    }
-    //fmt.Printf("OperatorMapList:%v\n", operatorMapList)
+	}
 
-    var crdNameList []string = make([]string, 0)
-    for _, operator := range operatorMapList {
-    	operatorDataMap = operator["Operator"]
+	var crdNameList []string = make([]string, 0)
+	for _, operator := range operatorMapList {
+		operatorDataMap = operator["Operator"]
 
-    	opName := operatorDataMap["Name"]
-    	customResources := operatorDataMap["CustomResources"]
-    	configMapName := operatorDataMap["ConfigMapName"]
+		customResources := operatorDataMap["CustomResources"]
 
-    	//fmt.Printf("Operator Name:%s\n", opName)
-    	//fmt.Printf("ConfigMapName:%s\n", configMapName)
-
-    	for _, cr := range customResources.([]interface{}) {
-    		//fmt.Printf("Custom Resource:%s\n", cr)
-    		crdNameList = append(crdNameList, cr.(string))
-    	}
-    }
-    return crdNameList
+		for _, cr := range customResources.([]interface{}) {
+			crdNameList = append(crdNameList, cr.(string))
+		}
+	}
+	return crdNameList
 }
 
 func getCRDDetails(crdDetailsString string) (string, string, string, []string) {
@@ -237,26 +231,23 @@ func getCRDDetails(crdDetailsString string) (string, string, string, []string) {
 	composition := make([]string, 0)
 
 	if err := json.Unmarshal([]byte(crdDetailsString), &crdDetailsMap); err != nil {
-        //panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
-    }
-    //fmt.Printf("CRDDetailsMap:%v\n", crdDetailsMap)
+	}
 
-    kind = crdDetailsMap["kind"].(string)
-    endpoint = crdDetailsMap["endpoint"].(string)
-    plural = crdDetailsMap["plural"].(string)
-    compositionString := crdDetailsMap["composition"].(string)
-    composition1 := strings.Split(compositionString, ",")
-    for _, elem := range composition1 {
-    	elem = strings.TrimSpace(elem)
-    	composition = append(composition, elem)
-    }
+	kind = crdDetailsMap["kind"].(string)
+	endpoint = crdDetailsMap["endpoint"].(string)
+	plural = crdDetailsMap["plural"].(string)
+	compositionString := crdDetailsMap["composition"].(string)
+	composition1 := strings.Split(compositionString, ",")
+	for _, elem := range composition1 {
+		elem = strings.TrimSpace(elem)
+		composition = append(composition, elem)
+	}
 
 	return kind, plural, endpoint, composition
 }
 
 func GetOpenAPISpec(customResourceKind string) string {
-	fmt.Println("Entering getOpenAPISpec")
 
 	// 1. Get ConfigMap Name by querying etcd at
 	resourceKey := "/" + customResourceKind + "-OpenAPISpecConfigMap"
@@ -264,42 +255,28 @@ func GetOpenAPISpec(customResourceKind string) string {
 
 	var configMapName string
 	if err := json.Unmarshal([]byte(configMapNameString), &configMapName); err != nil {
-        //panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
-    }
-    fmt.Printf("ConfigMapName:%v\n", configMapName)
-
+	}
 
 	// 2. Query ConfigMap
 	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
 	if err != nil {
-		//glog.Fatalf("Error building kubeconfig: %s", err.Error())
-		//panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
-		//glog.Fatalf("Error building kubernetes clientset: %s", err.Error())
-		//panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
 	}
 
 	configMap, err := kubeClient.CoreV1().ConfigMaps("default").Get(configMapName, metav1.GetOptions{})
 
 	if err != nil {
-		//panic(err)
 		fmt.Printf("Error:%s\n", err.Error())
 	}
 
-	fmt.Println("ConfigMap:%v", configMap)
-
 	configMapData := configMap.Data
 	openAPISpec := configMapData["openapispec"]
-
-	fmt.Printf("OpenAPISpec:%s\n", openAPISpec)
-
-	fmt.Println("Exiting getOpenAPISpec")
 
 	return openAPISpec
 }
@@ -315,17 +292,10 @@ func queryETCD(resourceKey string) string {
 	}
 	kapi := client.NewKeysAPI(c)
 
-	fmt.Printf("Getting value for %s\n", resourceKey)
 	resp, err1 := kapi.Get(context.Background(), resourceKey, nil)
 	if err1 != nil {
-		//log.Fatal(err1)
-		//fmt.Printf("Error:%s\n", err1.Error())
 		return string(err1.Error())
 	} else {
-		// print common key info
-		log.Printf("Get is done. Metadata is %q\n", resp)
-		// print value
-		log.Printf("%q key has %q value\n", resp.Node.Key, resp.Node.Value)
 		return resp.Node.Value
 	}
 	return ""
@@ -354,7 +324,7 @@ func getResourceKinds() []string {
 	return resourceKindSlice
 }
 
-func getResourceNames(resourceKind string) []MetaDataAndOwnerReferences{
+func getResourceNames(resourceKind string) []MetaDataAndOwnerReferences {
 	resourceApiVersion := kindVersionMap[resourceKind]
 	resourceKindPlural := KindPluralMap[resourceKind]
 	content := getResourceListContent(resourceApiVersion, resourceKindPlural)
@@ -366,39 +336,39 @@ func (cp *ClusterProvenance) PrintProvenance() {
 	cp.mux.Lock()
 	defer cp.mux.Unlock()
 	fmt.Println("Provenance of different Kinds in this Cluster")
-		for _, provenanceItem := range cp.clusterProvenance {
-			kind := provenanceItem.Kind
-			name := provenanceItem.Name
-			compositionTree := provenanceItem.CompositionTree
-			fmt.Printf("Kind: %s Name: %s Composition:\n", kind, name)
-			for _, compositionTreeNode := range *compositionTree {
-				level := compositionTreeNode.Level
-				childKind := compositionTreeNode.ChildKind
-				metaDataAndOwnerReferences := compositionTreeNode.Children
-				for _, metaDataNode := range metaDataAndOwnerReferences {
-					childName := metaDataNode.MetaDataName
-					childStatus := metaDataNode.Status
-					fmt.Printf("  %d %s %s %s\n", level, childKind, childName, childStatus)
-				}
+	for _, provenanceItem := range cp.clusterProvenance {
+		kind := provenanceItem.Kind
+		name := provenanceItem.Name
+		compositionTree := provenanceItem.CompositionTree
+		fmt.Printf("Kind: %s Name: %s Composition:\n", kind, name)
+		for _, compositionTreeNode := range *compositionTree {
+			level := compositionTreeNode.Level
+			childKind := compositionTreeNode.ChildKind
+			metaDataAndOwnerReferences := compositionTreeNode.Children
+			for _, metaDataNode := range metaDataAndOwnerReferences {
+				childName := metaDataNode.MetaDataName
+				childStatus := metaDataNode.Status
+				fmt.Printf("  %d %s %s %s\n", level, childKind, childName, childStatus)
 			}
-			fmt.Println("============================================")
 		}
+		fmt.Println("============================================")
+	}
 }
 
 func processed(processedList *[]CompositionTreeNode, nodeToCheck CompositionTreeNode) bool {
-     //fmt.Printf("ProcessedList:%v\n", processedList)
-     //fmt.Printf("NodeToCheck:%v\n", nodeToCheck)
-     var result bool = false
-     for _, compositionTreeNode1 := range *processedList {
-     	 if compositionTreeNode1.Level == nodeToCheck.Level && compositionTreeNode1.ChildKind == nodeToCheck.ChildKind {
-	    result = true
+	//fmt.Printf("ProcessedList:%v\n", processedList)
+	//fmt.Printf("NodeToCheck:%v\n", nodeToCheck)
+	var result bool = false
+	for _, compositionTreeNode1 := range *processedList {
+		if compositionTreeNode1.Level == nodeToCheck.Level && compositionTreeNode1.ChildKind == nodeToCheck.ChildKind {
+			result = true
+		}
 	}
-    }
-    return result
+	return result
 }
 
-func getComposition(kind, name, status string, level int, compositionTree *[]CompositionTreeNode, 
-     processedList *[]CompositionTreeNode) Composition {
+func getComposition(kind, name, status string, level int, compositionTree *[]CompositionTreeNode,
+	processedList *[]CompositionTreeNode) Composition {
 	//var provenanceString string
 	//fmt.Printf("-- Kind: %s Name: %s\n", kind, name)
 	//provenanceString = "Kind: " + kind + " Name:" + name + " Composition:\n"
@@ -412,27 +382,22 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 	//fmt.Printf("CompositionTree:%v\n", compositionTree)
 
 	for _, compositionTreeNode := range *compositionTree {
-	       	if processed(processedList, compositionTreeNode) {
-	       	  continue
-	        } 
+		if processed(processedList, compositionTreeNode) {
+			continue
+		}
 		level := compositionTreeNode.Level
 		childKind := compositionTreeNode.ChildKind
 		metaDataAndOwnerReferences := compositionTreeNode.Children
-		//childComposition.Children = []Composition{}
-		//var childrenList = []Composition{}
+
 		for _, metaDataNode := range metaDataAndOwnerReferences {
 			//provenanceString = provenanceString + " " + string(level) + " " + childKind + " " + childName + "\n"
-			//childComposition.Level = level
-			//childComposition.Kind = childKind
-			//childComposition.Name = childName
-			//childComposition.Status = childStatus
 			childName := metaDataNode.MetaDataName
 			childStatus := metaDataNode.Status
 			trimmedTree := []CompositionTreeNode{}
 			for _, compositionTreeNode1 := range *compositionTree {
-			    if compositionTreeNode1.Level != level && compositionTreeNode1.ChildKind != childKind {
-			       trimmedTree = append(trimmedTree, compositionTreeNode1)
-			    }
+				if compositionTreeNode1.Level != level && compositionTreeNode1.ChildKind != childKind {
+					trimmedTree = append(trimmedTree, compositionTreeNode1)
+				}
 			}
 			*processedList = append(*processedList, compositionTreeNode)
 			child := getComposition(childKind, childName, childStatus, level, &trimmedTree, processedList)
@@ -461,7 +426,7 @@ func getComposition1(kind, name, status string, compositionTree *[]CompositionTr
 		//childComposition.Children = []Composition{}
 		var childrenList = []Composition{}
 		for _, metaDataNode := range metaDataAndOwnerReferences {
-		       	childComposition := Composition{}
+			childComposition := Composition{}
 			childName := metaDataNode.MetaDataName
 			childStatus := metaDataNode.Status
 			fmt.Printf("  %d %s %s\n", level, childKind, childName)
@@ -487,7 +452,6 @@ func (cp *ClusterProvenance) GetProvenance(resourceKind, resourceName string) st
 	compositions := []Composition{}
 
 	resourceKindPlural := KindPluralMap[resourceKind]
-	//resourceKindPlural := resourceKind
 
 	//fmt.Println("Provenance of different Kinds in this Cluster")
 	//fmt.Printf("Kind:%s, Name:%s\n", resourceKindPlural, resourceName)
@@ -500,7 +464,7 @@ func (cp *ClusterProvenance) GetProvenance(resourceKind, resourceName string) st
 		//TODO(devdattakulkarni): Make route registration and provenance keyed info
 		//to use same kind name (plural). Currently Provenance info is keyed on
 		//singular kind names. For now, trimming the 's' at the end
-		//resourceKind = strings.TrimSuffix(resourceKind, "s") 
+		//resourceKind = strings.TrimSuffix(resourceKind, "s")
 		var resourceKind string
 		for key, value := range KindPluralMap {
 			if strings.ToLower(value) == strings.ToLower(resourceKindPlural) {
@@ -512,21 +476,19 @@ func (cp *ClusterProvenance) GetProvenance(resourceKind, resourceName string) st
 		//fmt.Printf("Kind:%s, Kind:%s, Name:%s, Name:%s\n", kind, resourceKind, name, resourceName)
 		if resourceName == "*" {
 			if resourceKind == kind {
-			        processedList := []CompositionTreeNode{}
+				processedList := []CompositionTreeNode{}
 				level := 1
 				composition := getComposition(kind, name, status, level, compositionTree, &processedList)
-					//provenanceInfo = provenanceInfo + provenanceForItem
 				compositions = append(compositions, composition)
 			}
 		} else if resourceKind == kind && resourceName == name {
-		        processedList := []CompositionTreeNode{}
+			processedList := []CompositionTreeNode{}
 			level := 1
 			composition := getComposition(kind, name, status, level, compositionTree, &processedList)
 			compositions = append(compositions, composition)
 		}
 	}
 
-	//fmt.Println("Compositions:\n%v",compositions)
 	provenanceBytes, err := json.Marshal(compositions)
 	if err != nil {
 		fmt.Println(err)
@@ -536,54 +498,52 @@ func (cp *ClusterProvenance) GetProvenance(resourceKind, resourceName string) st
 }
 
 func (cp *ClusterProvenance) purgeCompositionOfDeletedItems(topLevelMetaDataOwnerRefList []MetaDataAndOwnerReferences) {
-     presentList := []Provenance{}
-     //fmt.Println("ClusterProvenance:%v\n", cp.clusterProvenance)
-     //fmt.Println("ToplevelMetaDataOwnerList:%v\n", topLevelMetaDataOwnerRefList)
-     for _, prov := range cp.clusterProvenance {
-     	 for _, topLevelObject := range topLevelMetaDataOwnerRefList {
-     	     resourceName := topLevelObject.MetaDataName
-	     //fmt.Printf("ResourceName:%s, prov.Name:%s\n", resourceName, prov.Name)
-	     if resourceName == prov.Name {
-		presentList = append(presentList, prov)
-	     }
-     	 }
-     }
-     // Update clusterProvenance list
-     //fmt.Printf("Updated Cluster Prov List:%v\n", presentList)
-     cp.clusterProvenance = presentList
+	presentList := []Provenance{}
+	//fmt.Println("ClusterProvenance:%v\n", cp.clusterProvenance)
+	//fmt.Println("ToplevelMetaDataOwnerList:%v\n", topLevelMetaDataOwnerRefList)
+	for _, prov := range cp.clusterProvenance {
+		for _, topLevelObject := range topLevelMetaDataOwnerRefList {
+			resourceName := topLevelObject.MetaDataName
+			//fmt.Printf("ResourceName:%s, prov.Name:%s\n", resourceName, prov.Name)
+			if resourceName == prov.Name {
+				presentList = append(presentList, prov)
+			}
+		}
+	}
+	//fmt.Printf("Updated Cluster Prov List:%v\n", presentList)
+	cp.clusterProvenance = presentList
 }
-
 
 // This stores Provenance information in memory. The provenance information will be lost
 // when this Pod is deleted.
-func (cp *ClusterProvenance) storeProvenance(topLevelObject MetaDataAndOwnerReferences, 
-	resourceKind string, resourceName string, 
+func (cp *ClusterProvenance) storeProvenance(topLevelObject MetaDataAndOwnerReferences,
+	resourceKind string, resourceName string,
 	compositionTree *[]CompositionTreeNode) {
 	cp.mux.Lock()
 	defer cp.mux.Unlock()
 	provenance := Provenance{
-		Kind: resourceKind,
-		Name: resourceName,
-		Status: topLevelObject.Status,
+		Kind:            resourceKind,
+		Name:            resourceName,
+		Status:          topLevelObject.Status,
 		CompositionTree: compositionTree,
 	}
 	present := false
 	// If prov already exists then replace status and composition Tree
 	//fmt.Printf("00 CP:%v\n", cp.clusterProvenance)
 	for i, prov := range cp.clusterProvenance {
-	    if prov.Kind == provenance.Kind && prov.Name == provenance.Name {
-	       present = true
-	       p := &prov
-	       //fmt.Printf("CompositionTree:%v\n", compositionTree)
-	       p.CompositionTree = compositionTree
-	       p.Status = topLevelObject.Status
-	       cp.clusterProvenance[i] = *p
-	       //fmt.Printf("11 CP:%v\n", cp.clusterProvenance)
-	    }
+		if prov.Kind == provenance.Kind && prov.Name == provenance.Name {
+			present = true
+			p := &prov
+			//fmt.Printf("CompositionTree:%v\n", compositionTree)
+			p.CompositionTree = compositionTree
+			p.Status = topLevelObject.Status
+			cp.clusterProvenance[i] = *p
+			//fmt.Printf("11 CP:%v\n", cp.clusterProvenance)
+		}
 	}
 	if !present {
-	   cp.clusterProvenance = append(cp.clusterProvenance, provenance)
-	       //fmt.Printf("22 CP:%v\n", cp.clusterProvenance)
+		cp.clusterProvenance = append(cp.clusterProvenance, provenance)
+		//fmt.Printf("22 CP:%v\n", cp.clusterProvenance)
 	}
 	//fmt.Println("Exiting storeprovenance")
 	//fmt.Printf("ClusterProvenance:%v\n", cp.clusterProvenance)
@@ -596,11 +556,11 @@ func (cp *ClusterProvenance) storeProvenance(topLevelObject MetaDataAndOwnerRefe
 //Ref:https://github.com/coreos/etcd/tree/master/client
 func storeProvenance_etcd(resourceKind string, resourceName string, compositionTree *[]CompositionTreeNode) {
 	//fmt.Println("Entering storeProvenance")
-    jsonCompositionTree, err := json.Marshal(compositionTree)
-    if err != nil {
-        panic (err)
-    }
-    resourceProv := string(jsonCompositionTree)
+	jsonCompositionTree, err := json.Marshal(compositionTree)
+	if err != nil {
+		panic(err)
+	}
+	resourceProv := string(jsonCompositionTree)
 	cfg := client.Config{
 		//Endpoints: []string{"http://192.168.99.100:32379"},
 		Endpoints: []string{etcdServiceURL},
@@ -618,7 +578,7 @@ func storeProvenance_etcd(resourceKind string, resourceName string, compositionT
 	//resourceKey := "/compositions/Deployment/pod42test-deployment"
 	//resourceProv := "{1 ReplicaSet; 2 Pod -1}"
 	resourceKey := string("/compositions/" + resourceKind + "/" + resourceName)
-	fmt.Printf("Setting %s->%s\n",resourceKey, resourceProv)
+	fmt.Printf("Setting %s->%s\n", resourceKey, resourceProv)
 	resp, err := kapi.Set(context.Background(), resourceKey, resourceProv, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -626,7 +586,7 @@ func storeProvenance_etcd(resourceKind string, resourceName string, compositionT
 		// print common key info
 		log.Printf("Set is done. Metadata is %q\n", resp)
 	}
-	fmt.Printf("Getting value for %s\n", resourceKey)
+	//fmt.Printf("Getting value for %s\n", resourceKey)
 	resp, err = kapi.Get(context.Background(), resourceKey, nil)
 	if err != nil {
 		log.Fatal(err)
@@ -639,22 +599,25 @@ func storeProvenance_etcd(resourceKind string, resourceName string, compositionT
 	//fmt.Println("Exiting storeProvenance")
 }
 
-func buildProvenance(parentResourceKind string, parentResourceName string, level int, 
+func buildProvenance(parentResourceKind string, parentResourceName string, level int,
 	compositionTree *[]CompositionTreeNode) {
 	childResourceKindList, present := compositionMap[parentResourceKind]
 	if present {
 		level = level + 1
+
 		for _, childResourceKind := range childResourceKindList {
 			childKindPlural := KindPluralMap[childResourceKind]
 			childResourceApiVersion := kindVersionMap[childResourceKind]
-			content := getResourceListContent(childResourceApiVersion, childKindPlural)
-			metaDataAndOwnerReferenceList := parseMetaData(content)
-			//fmt.Printf("MetaDataORList:%v\n", metaDataAndOwnerReferenceList)
+			var content []byte
+			var metaDataAndOwnerReferenceList []MetaDataAndOwnerReferences
+			content = getResourceListContent(childResourceApiVersion, childKindPlural)
+			metaDataAndOwnerReferenceList = parseMetaData(content)
+
 			childrenList := filterChildren(&metaDataAndOwnerReferenceList, parentResourceName)
 			compTreeNode := CompositionTreeNode{
-				Level: level,
+				Level:     level,
 				ChildKind: childResourceKind,
-				Children: childrenList,
+				Children:  childrenList,
 			}
 
 			*compositionTree = append(*compositionTree, compTreeNode)
@@ -672,31 +635,36 @@ func buildProvenance(parentResourceKind string, parentResourceName string, level
 
 func getResourceListContent(resourceApiVersion, resourcePlural string) []byte {
 	//fmt.Println("Entering getResourceListContent")
-	url1 := fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, Namespace, resourcePlural)
+	var url1 string
+	if !strings.Contains(resourceApiVersion, resourcePlural) {
+	   url1 = fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, Namespace, resourcePlural)
+	} else {
+	  url1 = fmt.Sprintf("https://%s:%s/%s", serviceHost, servicePort, resourceApiVersion)
+	}
 	//fmt.Printf("Url:%s\n",url1)
 	caToken := getToken()
 	caCertPool := getCACert()
 	u, err := url.Parse(url1)
 	if err != nil {
-	  panic(err)
+		panic(err)
 	}
 	req, err := http.NewRequest(httpMethod, u.String(), nil)
 	if err != nil {
-	    fmt.Println(err)
+		fmt.Println(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(caToken)))
 	client := &http.Client{
-	  Transport: &http.Transport{
-	    TLSClientConfig: &tls.Config{
-	        RootCAs: caCertPool,
-	    },
-	  },
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: caCertPool,
+			},
+		},
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-	    log.Printf("sending request failed: %s", err.Error())
-	    fmt.Println(err)
+		log.Printf("sending request failed: %s", err.Error())
+		fmt.Println(err)
 	}
 	defer resp.Body.Close()
 	resp_body, _ := ioutil.ReadAll(resp.Body)
@@ -717,7 +685,6 @@ func parseMetaData(content []byte) []MetaDataAndOwnerReferences {
 	// metadata.ownerReferences.name
 	// metadata.ownerReferences.kind
 	// metadata.ownerReferences.apiVersion
-	//parentName := "podtest5-deployment"
 	metaDataSlice := []MetaDataAndOwnerReferences{}
 	items, ok := result["items"].([]interface{})
 
@@ -727,6 +694,12 @@ func parseMetaData(content []byte) []MetaDataAndOwnerReferences {
 			itemConverted := item.(map[string]interface{})
 			var metadataProcessed, statusProcessed bool
 			metaDataRef := MetaDataAndOwnerReferences{}
+			statusKeyExists := false
+			for key, _ := range itemConverted {
+			    if key == "status" {
+			       statusKeyExists = true
+			    }
+			}
 			for key, value := range itemConverted {
 				if key == "metadata" {
 					//fmt.Println("----")
@@ -784,8 +757,12 @@ func parseMetaData(content []byte) []MetaDataAndOwnerReferences {
 					}
 					statusProcessed = true
 				}
-				if metadataProcessed && statusProcessed {
+				if statusKeyExists {
+				   if metadataProcessed && statusProcessed {
 					metaDataSlice = append(metaDataSlice, metaDataRef)
+				   }
+				} else if metadataProcessed {
+				  metaDataSlice = append(metaDataSlice, metaDataRef)
 				}
 			}
 		}
@@ -802,12 +779,12 @@ func filterChildren(metaDataSlice *[]MetaDataAndOwnerReferences, parentResourceN
 			// Prevent duplicates
 			present := false
 			for _, node := range metaDataSliceToReturn {
-			   if node.MetaDataName == metaDataRef.MetaDataName {
-			      present = true
-			   } 
+				if node.MetaDataName == metaDataRef.MetaDataName {
+					present = true
+				}
 			}
 			if !present {
-			   metaDataSliceToReturn = append(metaDataSliceToReturn, metaDataRef)
+				metaDataSliceToReturn = append(metaDataSliceToReturn, metaDataRef)
 			}
 		}
 	}
@@ -818,7 +795,7 @@ func filterChildren(metaDataSlice *[]MetaDataAndOwnerReferences, parentResourceN
 func getToken() []byte {
 	caToken, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err != nil {
-	    panic(err) // cannot find token file
+		panic(err) // cannot find token file
 	}
 	//fmt.Printf("Token:%s", caToken)
 	return caToken
@@ -829,7 +806,7 @@ func getCACert() *cert.CertPool {
 	caCertPool := cert.NewCertPool()
 	caCert, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
 	if err != nil {
-	    panic(err) // Can't find cert file
+		panic(err) // Can't find cert file
 	}
 	//fmt.Printf("CaCert:%s",caCert)
 	caCertPool.AppendCertsFromPEM(caCert)
