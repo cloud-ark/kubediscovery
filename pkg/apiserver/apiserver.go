@@ -178,19 +178,19 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 
 func handleExplain(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
-	fmt.Printf("Kind:%s\n", customResourceKind)
+	//fmt.Printf("Kind:%s\n", customResourceKind)
 
 	customResourceKind, queryKind := getQueryKind(customResourceKind)
-	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
-	fmt.Printf("Query Kind:%s\n", queryKind)
+	//fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
+	//fmt.Printf("Query Kind:%s\n", queryKind)
 
 	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
-	fmt.Println("OpenAPI Spec:%v", openAPISpec)
+	//fmt.Println("OpenAPI Spec:%v", openAPISpec)
 
 	queryResponse := ""
 	if openAPISpec != "" {
 	   queryResponse = parseOpenAPISpec([]byte(openAPISpec), queryKind)
-	   fmt.Printf("Query response:%s\n", queryResponse)
+	   //fmt.Printf("Query response:%s\n", queryResponse)
 	}
 
 	response.Write([]byte(queryResponse))
