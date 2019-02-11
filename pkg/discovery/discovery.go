@@ -1,7 +1,6 @@
 package discovery
 
 import (
-	"context"
 	"crypto/tls"
 	cert "crypto/x509"
 	"encoding/json"
@@ -15,12 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coreos/etcd/client"
 	"gopkg.in/yaml.v2"
-
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 var (
@@ -202,120 +196,6 @@ func readKindCompositionFile() {
 	//printMaps()
 }
 
-func getCRDNames(crdListString string) []string {
-	var operatorMapList []map[string]map[string]interface{}
-	var operatorDataMap map[string]interface{}
-
-	if err := json.Unmarshal([]byte(crdListString), &operatorMapList); err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	var crdNameList []string = make([]string, 0)
-	for _, operator := range operatorMapList {
-		operatorDataMap = operator["Operator"]
-
-		customResources := operatorDataMap["CustomResources"]
-
-		for _, cr := range customResources.([]interface{}) {
-			crdNameList = append(crdNameList, cr.(string))
-		}
-	}
-	return crdNameList
-}
-
-func getCRDDetails(crdDetailsString string) (string, string, string, []string) {
-
-	var crdDetailsMap = make(map[string]interface{})
-	kind := ""
-	plural := ""
-	endpoint := ""
-	composition := make([]string, 0)
-
-	if err := json.Unmarshal([]byte(crdDetailsString), &crdDetailsMap); err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	kind = crdDetailsMap["kind"].(string)
-	endpoint = crdDetailsMap["endpoint"].(string)
-	plural = crdDetailsMap["plural"].(string)
-	compositionString := crdDetailsMap["composition"].(string)
-	composition1 := strings.Split(compositionString, ",")
-	for _, elem := range composition1 {
-		elem = strings.TrimSpace(elem)
-		composition = append(composition, elem)
-	}
-
-	return kind, plural, endpoint, composition
-}
-
-func GetOpenAPISpec(customResourceKind string) string {
-
-	// 1. Get ConfigMap Name by querying etcd at
-	resourceKey := "/" + customResourceKind + "-OpenAPISpecConfigMap"
-	configMapNameString := queryETCD(resourceKey)
-
-	var configMapName string
-	if err := json.Unmarshal([]byte(configMapNameString), &configMapName); err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	// 2. Query ConfigMap
-	cfg, err := clientcmd.BuildConfigFromFlags(masterURL, kubeconfig)
-	if err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	kubeClient, err := kubernetes.NewForConfig(cfg)
-	if err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	configMap, err := kubeClient.CoreV1().ConfigMaps("default").Get(configMapName, metav1.GetOptions{})
-
-	if err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-	}
-
-	configMapData := configMap.Data
-	openAPISpec := configMapData["openapispec"]
-
-	return openAPISpec
-}
-
-func queryETCD(resourceKey string) string {
-	cfg := client.Config{
-		Endpoints: []string{etcdServiceURL},
-		Transport: client.DefaultTransport,
-	}
-	c, err := client.New(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	kapi := client.NewKeysAPI(c)
-
-	resp, err1 := kapi.Get(context.Background(), resourceKey, nil)
-	if err1 != nil {
-		return string(err1.Error())
-	} else {
-		return resp.Node.Value
-	}
-}
-
-func printMaps() {
-	fmt.Println("Printing kindVersionMap")
-	for key, value := range kindVersionMap {
-		fmt.Printf("%s, %s\n", key, value)
-	}
-	fmt.Println("Printing KindPluralMap")
-	for key, value := range KindPluralMap {
-		fmt.Printf("%s, %s\n", key, value)
-	}
-	fmt.Println("Printing compositionMap")
-	for key, value := range compositionMap {
-		fmt.Printf("%s, %s\n", key, value)
-	}
-}
-
 func getResourceKinds() []string {
 	resourceKindSlice := make([]string, 0)
 	for key, _ := range compositionMap {
@@ -327,32 +207,9 @@ func getResourceKinds() []string {
 func getResourceNames(resourceKind string) []MetaDataAndOwnerReferences {
 	resourceApiVersion := kindVersionMap[resourceKind]
 	resourceKindPlural := KindPluralMap[resourceKind]
-	content := getResourceListContent(resourceApiVersion, resourceKindPlural)
+	content := queryAPIServer(resourceApiVersion, resourceKindPlural)
 	metaDataAndOwnerReferenceList := parseMetaData(content)
 	return metaDataAndOwnerReferenceList
-}
-
-func (cp *ClusterCompositions) PrintCompositions() {
-	cp.mux.Lock()
-	defer cp.mux.Unlock()
-	fmt.Println("Compositions of different Kinds in this Cluster")
-	for _, compositionItem := range cp.clusterCompositions {
-		kind := compositionItem.Kind
-		name := compositionItem.Name
-		compositionTree := compositionItem.CompositionTree
-		fmt.Printf("Kind: %s Name: %s Composition:\n", kind, name)
-		for _, compositionTreeNode := range *compositionTree {
-			level := compositionTreeNode.Level
-			childKind := compositionTreeNode.ChildKind
-			metaDataAndOwnerReferences := compositionTreeNode.Children
-			for _, metaDataNode := range metaDataAndOwnerReferences {
-				childName := metaDataNode.MetaDataName
-				childStatus := metaDataNode.Status
-				fmt.Printf("  %d %s %s %s\n", level, childKind, childName, childStatus)
-			}
-		}
-		fmt.Println("============================================")
-	}
 }
 
 func processed(processedList *[]CompositionTreeNode, nodeToCheck CompositionTreeNode) bool {
@@ -404,42 +261,6 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 			parentComposition.Children = append(parentComposition.Children, child)
 			compositionTree = &[]CompositionTreeNode{}
 		}
-	}
-	return parentComposition
-}
-
-func getComposition1(kind, name, status string, compositionTree *[]CompositionTreeNode) Composition {
-	var compositionString string
-	fmt.Printf("Kind: %s Name: %s Composition:\n", kind, name)
-	compositionString = "Kind: " + kind + " Name:" + name + " Composition:\n"
-	parentComposition := Composition{}
-	parentComposition.Level = 0
-	parentComposition.Kind = kind
-	parentComposition.Name = name
-	parentComposition.Status = status
-	parentComposition.Children = []Composition{}
-	var root = parentComposition
-	for _, compositionTreeNode := range *compositionTree {
-		level := compositionTreeNode.Level
-		childKind := compositionTreeNode.ChildKind
-		metaDataAndOwnerReferences := compositionTreeNode.Children
-		//childComposition.Children = []Composition{}
-		var childrenList = []Composition{}
-		for _, metaDataNode := range metaDataAndOwnerReferences {
-			childComposition := Composition{}
-			childName := metaDataNode.MetaDataName
-			childStatus := metaDataNode.Status
-			fmt.Printf("  %d %s %s\n", level, childKind, childName)
-			compositionString = compositionString + " " + string(level) + " " + childKind + " " + childName + "\n"
-			childComposition.Level = level
-			childComposition.Kind = childKind
-			childComposition.Name = childName
-			childComposition.Status = childStatus
-			childrenList = append(childrenList, childComposition)
-		}
-		root.Children = childrenList
-		fmt.Printf("Root composition:%v\n", root)
-		root = root.Children[0]
 	}
 	return parentComposition
 }
@@ -549,56 +370,6 @@ func (cp *ClusterCompositions) storeCompositions(topLevelObject MetaDataAndOwner
 	//fmt.Printf("ClusterCompositions:%v\n", cp.clusterCompositions)
 }
 
-// This stores Composition information in etcd accessible at the etcdServiceURL
-// One option to deploy etcd is to use the CoreOS etcd-operator.
-// The etcdServiceURL initialized in init() is for the example etcd cluster that
-// will be created by the etcd-operator. See https://github.com/coreos/etcd-operator
-//Ref:https://github.com/coreos/etcd/tree/master/client
-func storeCompositions_etcd(resourceKind string, resourceName string, compositionTree *[]CompositionTreeNode) {
-	//fmt.Println("Entering storeCompositions_etcd")
-	jsonCompositionTree, err := json.Marshal(compositionTree)
-	if err != nil {
-		panic(err)
-	}
-	resourceComps := string(jsonCompositionTree)
-	cfg := client.Config{
-		//Endpoints: []string{"http://192.168.99.100:32379"},
-		Endpoints: []string{etcdServiceURL},
-		Transport: client.DefaultTransport,
-		// set timeout per request to fail fast when the target endpoint is unavailable
-		//HeaderTimeoutPerRequest: time.Second,
-	}
-	//fmt.Printf("%v\n", cfg)
-	c, err := client.New(cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	kapi := client.NewKeysAPI(c)
-	// set "/foo" key with "bar" value
-	//resourceKey := "/compositions/Deployment/pod42test-deployment"
-	//resourceProv := "{1 ReplicaSet; 2 Pod -1}"
-	resourceKey := string("/compositions/" + resourceKind + "/" + resourceName)
-	fmt.Printf("Setting %s->%s\n", resourceKey, resourceComps)
-	resp, err := kapi.Set(context.Background(), resourceKey, resourceComps, nil)
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		// print common key info
-		log.Printf("Set is done. Metadata is %q\n", resp)
-	}
-	//fmt.Printf("Getting value for %s\n", resourceKey)
-	resp, err = kapi.Get(context.Background(), resourceKey, nil)
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		// print common key info
-		//log.Printf("Get is done. Metadata is %q\n", resp)
-		// print value
-		log.Printf("%q key has %q value\n", resp.Node.Key, resp.Node.Value)
-	}
-	//fmt.Println("Exiting storeCompositions_etcd")
-}
-
 func buildCompositions(parentResourceKind string, parentResourceName string, level int,
 	compositionTree *[]CompositionTreeNode) {
 	childResourceKindList, present := compositionMap[parentResourceKind]
@@ -610,7 +381,7 @@ func buildCompositions(parentResourceKind string, parentResourceName string, lev
 			childResourceApiVersion := kindVersionMap[childResourceKind]
 			var content []byte
 			var metaDataAndOwnerReferenceList []MetaDataAndOwnerReferences
-			content = getResourceListContent(childResourceApiVersion, childKindPlural)
+			content = queryAPIServer(childResourceApiVersion, childKindPlural)
 			metaDataAndOwnerReferenceList = parseMetaData(content)
 
 			childrenList := filterChildren(&metaDataAndOwnerReferenceList, parentResourceName)
@@ -633,8 +404,8 @@ func buildCompositions(parentResourceKind string, parentResourceName string, lev
 	}
 }
 
-func getResourceListContent(resourceApiVersion, resourcePlural string) []byte {
-	//fmt.Println("Entering getResourceListContent")
+func queryAPIServer(resourceApiVersion, resourcePlural string) []byte {
+	//fmt.Println("Entering queryAPIServer")
 	var url1 string
 	if !strings.Contains(resourceApiVersion, resourcePlural) {
 		url1 = fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, Namespace, resourcePlural)
@@ -671,7 +442,7 @@ func getResourceListContent(resourceApiVersion, resourcePlural string) []byte {
 
 	//fmt.Println(resp.Status)
 	//fmt.Println(string(resp_body))
-	//fmt.Println("Exiting getResourceListContent")
+	//fmt.Println("Exiting queryAPIServer")
 	return resp_body
 }
 
