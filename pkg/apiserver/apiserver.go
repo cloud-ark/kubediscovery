@@ -23,6 +23,7 @@ const GroupName = "kubeplus.cloudark.io"
 const GroupVersion = "v1"
 const KIND_QUERY_PARAM = "kind"
 const INSTANCE_QUERY_PARAM = "instance"
+const NAMESPACE_QUERY_PARAM = "namespace"
 
 var (
 	Scheme             = runtime.NewScheme()
@@ -60,7 +61,6 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
-
 	// Start collecting provenance
 	go discovery.BuildCompositionTree()
 }
@@ -179,11 +179,9 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 func handleExplain(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	//fmt.Printf("Kind:%s\n", customResourceKind)
-
 	customResourceKind, queryKind := getQueryKind(customResourceKind)
 	//fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 	//fmt.Printf("Query Kind:%s\n", queryKind)
-
 	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
 	//fmt.Println("OpenAPI Spec:%v", openAPISpec)
 
@@ -200,6 +198,7 @@ func handleComposition(request *restful.Request, response *restful.Response) {
 
 	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
+	namespace := request.QueryParameter(NAMESPACE_QUERY_PARAM)
 
 	/*
 			Note: We cannot generically convert kind to 'first letter capital' form
@@ -217,8 +216,10 @@ func handleComposition(request *restful.Request, response *restful.Response) {
 	*/
 
 	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance)
-
-	describeInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceInstance)
+	if namespace == "" {
+		namespace = "default"
+	}
+	describeInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceInstance, namespace)
 	fmt.Printf("Composition:%v\n", describeInfo)
 
 	response.Write([]byte(describeInfo))
@@ -256,14 +257,15 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	fmt.Printf("Resource Name:%s\n", resourceName)
 	fmt.Printf("Request Path:%s\n", requestPath)
 	//discovery.TotalClusterCompositions.PrintCompositions()
-
 	// Path looks as follows:
 	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
 	resourcePathSlice := strings.Split(requestPath, "/")
 	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
+	resourceNamespace := resourcePathSlice[5]
 	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
-	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName)
-	fmt.Println("Compositions Info:%v", compositionsInfo)
+
+	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName, resourceNamespace)
+	fmt.Printf("Compositions Info:%v", compositionsInfo)
 
 	response.Write([]byte(compositionsInfo))
 }

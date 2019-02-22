@@ -14,17 +14,19 @@ type composition struct {
 
 // Used for Final output
 type Composition struct {
-	Level    int
-	Kind     string
-	Name     string
-	Status   string
-	Children []Composition
+	Level     int
+	Kind      string
+	Name      string
+	Namespace string
+	Status    string
+	Children  []Composition
 }
 
 // Used to store information queried from the main API server
 type MetaDataAndOwnerReferences struct {
 	MetaDataName             string
 	Status                   string
+	Namespace                string
 	OwnerReferenceName       string
 	OwnerReferenceKind       string
 	OwnerReferenceAPIVersion string
@@ -42,6 +44,7 @@ type CompositionTreeNode struct {
 type Compositions struct {
 	Kind            string
 	Name            string
+	Namespace       string
 	Status          string
 	CompositionTree *[]CompositionTreeNode
 }
