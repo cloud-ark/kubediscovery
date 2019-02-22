@@ -6,13 +6,13 @@ import (
 
 	"encoding/json"
 
+	"github.com/emicklei/go-restful"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/version"
 	genericapiserver "k8s.io/apiserver/pkg/server"
-	"github.com/emicklei/go-restful"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
@@ -25,11 +25,11 @@ const KIND_QUERY_PARAM = "kind"
 const INSTANCE_QUERY_PARAM = "instance"
 
 var (
-	Scheme = runtime.NewScheme()
-	Codecs = serializer.NewCodecFactory(Scheme)
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	AddToScheme   = SchemeBuilder.AddToScheme
-    SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
+	Scheme             = runtime.NewScheme()
+	Codecs             = serializer.NewCodecFactory(Scheme)
+	SchemeBuilder      = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme        = SchemeBuilder.AddToScheme
+	SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: GroupVersion}
 )
 
 func addKnownTypes(scheme *runtime.Scheme) error {
@@ -44,7 +44,7 @@ func init() {
 	utilruntime.Must(Scheme.SetVersionPriority(SchemeGroupVersion))
 
 	// TODO(devdattakulkarni) -- Following comments coming from sample-apiserver.
-	// Leaving them for now. 
+	// Leaving them for now.
 	// we need to add the options to empty v1
 	// TODO fix the server code to avoid this
 	metav1.AddToGroupVersion(Scheme, schema.GroupVersion{Version: GroupVersion})
@@ -135,7 +135,7 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 func installExplainAlternate(discoveryServer *DiscoveryServer) {
 
 	path := "/apis/" + GroupName + "/" + GroupVersion
-	
+
 	explainPath := path + "/explain"
 	fmt.Printf("Explain PATH:%s\n", explainPath)
 	//ws1 := getWebService()
@@ -153,7 +153,7 @@ func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
 	//path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/" + discovery.Namespace
 
 	path := "/apis/" + GroupName + "/" + GroupVersion
-	
+
 	explainPath := path + "/explain"
 	fmt.Printf("Explain PATH:%s\n", explainPath)
 	ws1 := getWebService()
@@ -189,8 +189,8 @@ func handleExplain(request *restful.Request, response *restful.Response) {
 
 	queryResponse := ""
 	if openAPISpec != "" {
-	   queryResponse = parseOpenAPISpec([]byte(openAPISpec), queryKind)
-	   //fmt.Printf("Query response:%s\n", queryResponse)
+		queryResponse = parseOpenAPISpec([]byte(openAPISpec), queryKind)
+		//fmt.Printf("Query response:%s\n", queryResponse)
 	}
 
 	response.Write([]byte(queryResponse))
@@ -202,23 +202,23 @@ func handleComposition(request *restful.Request, response *restful.Response) {
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
 
 	/*
-	Note: We cannot generically convert kind to 'first letter capital' form
-	as there are Kinds like ReplicaSet in which the middle s needs to be 'S'
-	and not 's'. So commenting out below. So we are going to require providing
-        the exact Kind name such as: Pod, Deployment, Postgres, etc.
-	Also note that we are going to require input as singular Kind Name and not
-	plural (as we had with the compositions endpoint)
-	resourceKind = strings.ToLower(resourceKind)
-	parts := strings.Split(resourceKind, "")
-	firstPart := string(parts[0])
-	firstPart = strings.ToUpper(firstPart)
-	secondPart := strings.Join(parts[1:], "")
-	resourceKind = firstPart + secondPart
+			Note: We cannot generically convert kind to 'first letter capital' form
+			as there are Kinds like ReplicaSet in which the middle s needs to be 'S'
+			and not 's'. So commenting out below. So we are going to require providing
+		        the exact Kind name such as: Pod, Deployment, Postgres, etc.
+			Also note that we are going to require input as singular Kind Name and not
+			plural (as we had with the compositions endpoint)
+			resourceKind = strings.ToLower(resourceKind)
+			parts := strings.Split(resourceKind, "")
+			firstPart := string(parts[0])
+			firstPart = strings.ToUpper(firstPart)
+			secondPart := strings.Join(parts[1:], "")
+			resourceKind = firstPart + secondPart
 	*/
 
-	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance) 
+	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance)
 
-	describeInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceInstance)
+	describeInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceInstance)
 	fmt.Printf("Composition:%v\n", describeInfo)
 
 	response.Write([]byte(describeInfo))
@@ -255,32 +255,32 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	fmt.Printf("Printing Composition\n")
 	fmt.Printf("Resource Name:%s\n", resourceName)
 	fmt.Printf("Request Path:%s\n", requestPath)
-	//provenance.TotalClusterProvenance.PrintProvenance()
+	//discovery.TotalClusterCompositions.PrintCompositions()
 
 	// Path looks as follows:
 	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
 	resourcePathSlice := strings.Split(requestPath, "/")
 	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
 	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
-	provenanceInfo := discovery.TotalClusterProvenance.GetProvenance(resourceKind, resourceName)
-	fmt.Println("Provenance Info:%v", provenanceInfo)
+	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName)
+	fmt.Println("Compositions Info:%v", compositionsInfo)
 
-	response.Write([]byte(provenanceInfo))
+	response.Write([]byte(compositionsInfo))
 }
 
 func getQueryKind(input string) (string, string) {
 
-     // Input can be Postgres.PostgresSpec.UserSpec
-     // Return the last entry (i.e. UserSpec in above example)
-     customResourceKind := ""
-     queryKind := ""
-     
-     parts := strings.Split(input, ".")
-     
-     queryKind = parts[len(parts)-1]
-     customResourceKind = parts[0]
-     
-     return customResourceKind, queryKind
+	// Input can be Postgres.PostgresSpec.UserSpec
+	// Return the last entry (i.e. UserSpec in above example)
+	customResourceKind := ""
+	queryKind := ""
+
+	parts := strings.Split(input, ".")
+
+	queryKind = parts[len(parts)-1]
+	customResourceKind = parts[0]
+
+	return customResourceKind, queryKind
 }
 
 func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
@@ -288,7 +288,7 @@ func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
 	retVal := ""
 	err := json.Unmarshal(openAPISpec, &data)
 	if err != nil {
-	   fmt.Printf("Error:%v\n", err)
+		fmt.Printf("Error:%v\n", err)
 	}
 
 	overallMap := data.(map[string]interface{})
@@ -301,10 +301,10 @@ func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
 	result, err1 := json.Marshal(resultMap)
 
 	if err1 != nil {
-	   fmt.Printf("Error:%v\n", err1)
+		fmt.Printf("Error:%v\n", err1)
 	}
 
-	retVal = string(result)	
+	retVal = string(result)
 
 	return retVal
 }
