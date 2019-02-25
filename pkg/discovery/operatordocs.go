@@ -64,7 +64,7 @@ func GetOpenAPISpec(customResourceKind string) string {
 
 	// 1. Get ConfigMap Name by querying etcd at
 	resourceKey := "/" + customResourceKind + "-OpenAPISpecConfigMap"
-	configMapNameString := queryETCD(resourceKey)
+	configMapNameString, err := queryETCD(resourceKey)
 
 	var configMapName string
 	if err := json.Unmarshal([]byte(configMapNameString), &configMapName); err != nil {
@@ -94,7 +94,7 @@ func GetOpenAPISpec(customResourceKind string) string {
 	return openAPISpec
 }
 
-func queryETCD(resourceKey string) string {
+func queryETCD(resourceKey string) (string, error) {
 	cfg := client.Config{
 		Endpoints: []string{etcdServiceURL},
 		Transport: client.DefaultTransport,
@@ -107,8 +107,8 @@ func queryETCD(resourceKey string) string {
 
 	resp, err1 := kapi.Get(context.Background(), resourceKey, nil)
 	if err1 != nil {
-		return string(err1.Error())
+		return "", err1
 	} else {
-		return resp.Node.Value
+		return resp.Node.Value, nil
 	}
 }

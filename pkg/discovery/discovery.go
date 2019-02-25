@@ -179,12 +179,16 @@ func readKindCompositionFile() {
 		}
 	} else {
 		// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
-		crdListString := queryETCD("/operators")
-		if crdListString != "" {
+		crdListString, err := queryETCD("/operators")
+		if err == nil && crdListString != "" {
 			crdNameList := getCRDNames(crdListString)
 
 			for _, crdName := range crdNameList {
-				crdDetailsString := queryETCD("/" + crdName)
+				crdDetailsString, err := queryETCD("/" + crdName)
+				if err != nil {
+					fmt.Printf("Error: %s\n", err.Error())
+					return
+				}
 				kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
 
 				KindPluralMap[kind] = plural
