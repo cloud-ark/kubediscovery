@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"go.etcd.io/etcd/client"
+	"github.com/coreos/etcd/client"
 )
 
 func getComposition1(kind, name, status string, compositionTree *[]CompositionTreeNode) Composition {
