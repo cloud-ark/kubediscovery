@@ -107,7 +107,10 @@ func init() {
 
 func BuildCompositionTree() {
 	for {
-		readKindCompositionFile()
+		err := readKindCompositionFile()
+		if err != nil {
+			fmt.Printf("Error: %s\n", err.Error())
+		}
 		resourceKindList := getResourceKinds()
 		resourceInCluster := []MetaDataAndOwnerReferences{}
 		for _, resourceKind := range resourceKindList {
@@ -154,18 +157,20 @@ func (cp *ClusterCompositions) checkIfProvenanceNeeded(resourceKind, resourceNam
 	return true
 }
 
-func readKindCompositionFile() {
+func readKindCompositionFile() error {
 	// read from the opt file
 	filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
 	if ok {
 		yamlFile, err := ioutil.ReadFile(filePath)
 		if err != nil {
-			fmt.Printf("Error reading file:%s", err)
+			return err
 		}
 
 		compositionsList := make([]composition, 0)
 		err = yaml.Unmarshal(yamlFile, &compositionsList)
-
+		if err != nil {
+			return err
+		}
 		for _, compositionObj := range compositionsList {
 			kind := compositionObj.Kind
 			endpoint := compositionObj.Endpoint
@@ -180,14 +185,15 @@ func readKindCompositionFile() {
 	} else {
 		// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
 		crdListString, err := queryETCD("/operators")
-		if err == nil && crdListString != "" {
+		if err != nil {
+			return err
+		}
+		if crdListString != "" {
 			crdNameList := getCRDNames(crdListString)
-
 			for _, crdName := range crdNameList {
 				crdDetailsString, err := queryETCD("/" + crdName)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return err
 				}
 				kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
 
@@ -198,6 +204,7 @@ func readKindCompositionFile() {
 		}
 	}
 	//printMaps()
+	return nil
 }
 
 func getResourceKinds() []string {
