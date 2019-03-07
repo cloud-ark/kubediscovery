@@ -112,28 +112,31 @@ func BuildCompositionTree() {
 			fmt.Printf("Error: %s\n", err.Error())
 		}
 		resourceKindList := getResourceKinds()
+		namespaces := getAllNamespaces()
+
 		resourceInCluster := []MetaDataAndOwnerReferences{}
 		for _, resourceKind := range resourceKindList {
-			topLevelMetaDataOwnerRefList := getResourceNames(resourceKind)
-			//fmt.Printf("TopLevelMetaDataOwnerRefList:%v\n", topLevelMetaDataOwnerRefList)
-			for _, topLevelObject := range topLevelMetaDataOwnerRefList {
-				resourceName := topLevelObject.MetaDataName
-
-				level := 1
-				compositionTree := []CompositionTreeNode{}
-				buildCompositions(resourceKind, resourceName, level, &compositionTree)
-				//fmt.Printf("CompositionTree:%v\n", compositionTree)
-				TotalClusterCompositions.storeCompositions(topLevelObject, resourceKind, resourceName, &compositionTree)
-			}
-			for _, resource := range topLevelMetaDataOwnerRefList {
-				present := false
-				for _, res := range resourceInCluster {
-					if res.MetaDataName == resource.MetaDataName {
-						present = true
-					}
+			for _, namespace := range namespaces {
+				topLevelMetaDataOwnerRefList := getResourceNames(resourceKind, namespace)
+				// fmt.Printf("TopLevelMetaDataOwnerRefList: %s: %v\n", namespace, topLevelMetaDataOwnerRefList)
+				for _, topLevelObject := range topLevelMetaDataOwnerRefList {
+					resourceName := topLevelObject.MetaDataName
+					namespace := topLevelObject.Namespace
+					level := 1
+					compositionTree := []CompositionTreeNode{}
+					buildCompositions(resourceKind, resourceName, namespace, level, &compositionTree)
+					TotalClusterCompositions.storeCompositions(topLevelObject, resourceKind, resourceName, namespace, &compositionTree)
 				}
-				if !present {
-					resourceInCluster = append(resourceInCluster, resource)
+				for _, resource := range topLevelMetaDataOwnerRefList {
+					present := false
+					for _, res := range resourceInCluster {
+						if res.MetaDataName == resource.MetaDataName {
+							present = true
+						}
+					}
+					if !present {
+						resourceInCluster = append(resourceInCluster, resource)
+					}
 				}
 			}
 		}
@@ -215,10 +218,10 @@ func getResourceKinds() []string {
 	return resourceKindSlice
 }
 
-func getResourceNames(resourceKind string) []MetaDataAndOwnerReferences {
+func getResourceNames(resourceKind, namespace string) []MetaDataAndOwnerReferences {
 	resourceApiVersion := kindVersionMap[resourceKind]
 	resourceKindPlural := KindPluralMap[resourceKind]
-	content := queryAPIServer(resourceApiVersion, resourceKindPlural)
+	content := queryAPIServer(resourceApiVersion, resourceKindPlural, namespace)
 	metaDataAndOwnerReferenceList := parseMetaData(content)
 	return metaDataAndOwnerReferenceList
 }
@@ -235,7 +238,7 @@ func processed(processedList *[]CompositionTreeNode, nodeToCheck CompositionTree
 	return result
 }
 
-func getComposition(kind, name, status string, level int, compositionTree *[]CompositionTreeNode,
+func getComposition(kind, name, namespace, status string, level int, compositionTree *[]CompositionTreeNode,
 	processedList *[]CompositionTreeNode) Composition {
 	//var compositionsString string
 	//fmt.Printf("-- Kind: %s Name: %s\n", kind, name)
@@ -244,6 +247,7 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 	parentComposition.Level = level
 	parentComposition.Kind = kind
 	parentComposition.Name = name
+	parentComposition.Namespace = namespace
 	parentComposition.Status = status
 	parentComposition.Children = []Composition{}
 
@@ -260,6 +264,9 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 		for _, metaDataNode := range metaDataAndOwnerReferences {
 			//compositionsString = compositionsString + " " + string(level) + " " + childKind + " " + childName + "\n"
 			childName := metaDataNode.MetaDataName
+			childNamespace := metaDataNode.Namespace
+
+			// childNamespace := metaDataNode.MetaDataNamespace
 			childStatus := metaDataNode.Status
 			trimmedTree := []CompositionTreeNode{}
 			for _, compositionTreeNode1 := range *compositionTree {
@@ -268,7 +275,7 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 				}
 			}
 			*processedList = append(*processedList, compositionTreeNode)
-			child := getComposition(childKind, childName, childStatus, level, &trimmedTree, processedList)
+			child := getComposition(childKind, childName, childNamespace, childStatus, level, &trimmedTree, processedList)
 			parentComposition.Children = append(parentComposition.Children, child)
 			compositionTree = &[]CompositionTreeNode{}
 		}
@@ -276,7 +283,7 @@ func getComposition(kind, name, status string, level int, compositionTree *[]Com
 	return parentComposition
 }
 
-func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName string) string {
+func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, namespace string) string {
 	cp.mux.Lock()
 	defer cp.mux.Unlock()
 	var compositionBytes []byte
@@ -284,12 +291,13 @@ func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName string
 	compositions := []Composition{}
 
 	resourceKindPlural := KindPluralMap[resourceKind]
-
 	//fmt.Println("Compositions of different Kinds in this Cluster")
 	//fmt.Printf("Kind:%s, Name:%s\n", resourceKindPlural, resourceName)
+	fmt.Println(len(cp.clusterCompositions))
 	for _, compositionItem := range cp.clusterCompositions {
 		kind := strings.ToLower(compositionItem.Kind)
 		name := strings.ToLower(compositionItem.Name)
+		nmspace := strings.ToLower(compositionItem.Namespace)
 		status := compositionItem.Status
 		compositionTree := compositionItem.CompositionTree
 		resourceKindPlural := strings.ToLower(resourceKindPlural)
@@ -306,18 +314,22 @@ func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName string
 		}
 		resourceName := strings.ToLower(resourceName)
 		//fmt.Printf("Kind:%s, Kind:%s, Name:%s, Name:%s\n", kind, resourceKind, name, resourceName)
-		if resourceName == "*" {
-			if resourceKind == kind {
-				processedList := []CompositionTreeNode{}
-				level := 1
-				composition := getComposition(kind, name, status, level, compositionTree, &processedList)
-				compositions = append(compositions, composition)
-			}
-		} else if resourceKind == kind && resourceName == name {
+
+		switch {
+		case namespace != nmspace:
+			break
+		case resourceName == "*" && resourceKind == kind && namespace == nmspace:
 			processedList := []CompositionTreeNode{}
 			level := 1
-			composition := getComposition(kind, name, status, level, compositionTree, &processedList)
+			composition := getComposition(kind, name, namespace, status, level, compositionTree, &processedList)
 			compositions = append(compositions, composition)
+			break
+		case resourceName == name && resourceKind == kind && namespace == nmspace:
+			processedList := []CompositionTreeNode{}
+			level := 1
+			composition := getComposition(kind, name, namespace, status, level, compositionTree, &processedList)
+			compositions = append(compositions, composition)
+			break
 		}
 	}
 
@@ -349,13 +361,14 @@ func (cp *ClusterCompositions) purgeCompositionOfDeletedItems(topLevelMetaDataOw
 // This stores Compositions information in memory. The compositions information will be lost
 // when this Pod is deleted.
 func (cp *ClusterCompositions) storeCompositions(topLevelObject MetaDataAndOwnerReferences,
-	resourceKind string, resourceName string,
+	resourceKind, resourceName, namespace string,
 	compositionTree *[]CompositionTreeNode) {
 	cp.mux.Lock()
 	defer cp.mux.Unlock()
 	compositions := Compositions{
 		Kind:            resourceKind,
 		Name:            resourceName,
+		Namespace:       namespace,
 		Status:          topLevelObject.Status,
 		CompositionTree: compositionTree,
 	}
@@ -363,7 +376,7 @@ func (cp *ClusterCompositions) storeCompositions(topLevelObject MetaDataAndOwner
 	// If prov already exists then replace status and composition Tree
 	//fmt.Printf("00 CP:%v\n", cp.clusterCompositions)
 	for i, comp := range cp.clusterCompositions {
-		if comp.Kind == compositions.Kind && comp.Name == compositions.Name {
+		if comp.Kind == compositions.Kind && comp.Name == compositions.Name && comp.Namespace == compositions.Namespace {
 			present = true
 			p := &comp
 			//fmt.Printf("CompositionTree:%v\n", compositionTree)
@@ -381,7 +394,7 @@ func (cp *ClusterCompositions) storeCompositions(topLevelObject MetaDataAndOwner
 	//fmt.Printf("ClusterCompositions:%v\n", cp.clusterCompositions)
 }
 
-func buildCompositions(parentResourceKind string, parentResourceName string, level int,
+func buildCompositions(parentResourceKind string, parentResourceName string, parentNamespace string, level int,
 	compositionTree *[]CompositionTreeNode) {
 	childResourceKindList, present := compositionMap[parentResourceKind]
 	if present {
@@ -392,7 +405,7 @@ func buildCompositions(parentResourceKind string, parentResourceName string, lev
 			childResourceApiVersion := kindVersionMap[childResourceKind]
 			var content []byte
 			var metaDataAndOwnerReferenceList []MetaDataAndOwnerReferences
-			content = queryAPIServer(childResourceApiVersion, childKindPlural)
+			content = queryAPIServer(childResourceApiVersion, childKindPlural, parentNamespace)
 			metaDataAndOwnerReferenceList = parseMetaData(content)
 
 			childrenList := filterChildren(&metaDataAndOwnerReferenceList, parentResourceName)
@@ -407,19 +420,52 @@ func buildCompositions(parentResourceKind string, parentResourceName string, lev
 			for _, metaDataRef := range childrenList {
 				resourceName := metaDataRef.MetaDataName
 				resourceKind := childResourceKind
-				buildCompositions(resourceKind, resourceName, level, compositionTree)
+				buildCompositions(resourceKind, resourceName, parentNamespace, level, compositionTree)
 			}
 		}
 	} else {
 		return
 	}
 }
+func getAllNamespaces() []string {
+	var url1 string
+	url1 = fmt.Sprintf("https://%s:%s/%s/namespaces", serviceHost, servicePort, "api/v1")
 
-func queryAPIServer(resourceApiVersion, resourcePlural string) []byte {
-	//fmt.Println("Entering queryAPIServer")
+	//fmt.Printf("Url:%s\n",url1)
+	caToken := getToken()
+	caCertPool := getCACert()
+	u, err := url.Parse(url1)
+	if err != nil {
+		panic(err)
+	}
+	req, err := http.NewRequest(httpMethod, u.String(), nil)
+	if err != nil {
+		fmt.Println(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", string(caToken)))
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs: caCertPool,
+			},
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("sending request failed: %s", err.Error())
+		fmt.Println(err)
+	}
+	defer resp.Body.Close()
+	resp_body, _ := ioutil.ReadAll(resp.Body)
+
+	return parseNamespacesResponse(resp_body)
+}
+
+func queryAPIServer(resourceApiVersion, resourcePlural, namespace string) []byte {
 	var url1 string
 	if !strings.Contains(resourceApiVersion, resourcePlural) {
-		url1 = fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, Namespace, resourcePlural)
+		url1 = fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, namespace, resourcePlural)
 	} else {
 		url1 = fmt.Sprintf("https://%s:%s/%s", serviceHost, servicePort, resourceApiVersion)
 	}
@@ -507,6 +553,9 @@ func parseMetaData(content []byte) []MetaDataAndOwnerReferences {
 								}
 							}
 						}
+						if mkey == "namespace" {
+							metaDataRef.Namespace = mvalue.(string)
+						}
 						if mkey == "name" {
 							metaDataRef.MetaDataName = mvalue.(string)
 						}
@@ -571,6 +620,31 @@ func filterChildren(metaDataSlice *[]MetaDataAndOwnerReferences, parentResourceN
 		}
 	}
 	return metaDataSliceToReturn
+}
+
+func parseNamespacesResponse(content []byte) []string {
+	var result map[string]interface{}
+	json.Unmarshal([]byte(content), &result)
+	namespaces := make([]string, 0)
+	items, ok := result["items"].([]interface{})
+
+	if ok {
+		for _, item := range items {
+			itemConverted := item.(map[string]interface{})
+			for key, value := range itemConverted {
+				if key == "metadata" {
+					metadataMap := value.(map[string]interface{})
+					for mkey, mvalue := range metadataMap {
+						if mkey == "name" {
+							namespace := mvalue.(string)
+							namespaces = append(namespaces, namespace)
+						}
+					}
+				}
+			}
+		}
+	}
+	return namespaces
 }
 
 // Ref:https://stackoverflow.com/questions/30690186/how-do-i-access-the-kubernetes-api-from-within-a-pod-container
