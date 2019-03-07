@@ -37,6 +37,7 @@ var (
 	PVCLAIM      string
 	PV           string
 	ETCD_CLUSTER string
+	INGRESS      string
 )
 
 var (
@@ -68,6 +69,7 @@ func init() {
 	PVCLAIM = "PersistentVolumeClaim"
 	PV = "PersistentVolume"
 	ETCD_CLUSTER = "EtcdCluster"
+	INGRESS = "Ingress"
 
 	KindPluralMap = make(map[string]string)
 	kindVersionMap = make(map[string]string)
@@ -103,6 +105,10 @@ func init() {
 	KindPluralMap[PV] = "persistentvolumes"
 	kindVersionMap[PV] = "api/v1/persistentvolumes"
 	compositionMap[PV] = []string{}
+
+	KindPluralMap[INGRESS] = "ingresses"
+	kindVersionMap[INGRESS] = "apis/extensions/v1beta1"
+	compositionMap[INGRESS] = []string{}
 }
 
 func BuildCompositionTree() {
@@ -289,11 +295,9 @@ func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, names
 	var compositionBytes []byte
 	var compositionString string
 	compositions := []Composition{}
-
 	resourceKindPlural := KindPluralMap[resourceKind]
 	//fmt.Println("Compositions of different Kinds in this Cluster")
 	//fmt.Printf("Kind:%s, Name:%s\n", resourceKindPlural, resourceName)
-	fmt.Println(len(cp.clusterCompositions))
 	for _, compositionItem := range cp.clusterCompositions {
 		kind := strings.ToLower(compositionItem.Kind)
 		name := strings.ToLower(compositionItem.Name)
@@ -335,7 +339,7 @@ func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, names
 
 	compositionBytes, err := json.Marshal(compositions)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(err.Error())
 	}
 	compositionString = string(compositionBytes)
 	return compositionString
