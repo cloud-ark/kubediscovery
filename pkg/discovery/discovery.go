@@ -193,24 +193,31 @@ func readKindCompositionFile() error {
 		}
 	} else {
 		// Populate the Kind maps by querying CRDs from ETCD and querying KAPI for details of each CRD
-		crdListString, err := queryETCD("/operators")
+		/*
+			crdListString, err := queryETCD("/operators")
+			if err != nil {
+				return err
+			}
+		*/
+		//if crdListString != "" {
+		//crdNameList := getCRDNames(crdListString)
+		//crdDetails := queryETCD("/crds")
+		crdNameList, err := queryETCDNodes("/crds")
 		if err != nil {
 			return err
 		}
-		if crdListString != "" {
-			crdNameList := getCRDNames(crdListString)
-			for _, crdName := range crdNameList {
-				crdDetailsString, err := queryETCD("/" + crdName)
-				if err != nil {
-					return err
-				}
-				kind, plural, endpoint, composition := getCRDDetails(crdDetailsString)
-
-				KindPluralMap[kind] = plural
-				kindVersionMap[kind] = endpoint
-				compositionMap[kind] = composition
+		for _, crdName := range crdNameList {
+			crdDetailsString, err := queryETCD("/" + crdName)
+			if err != nil {
+				return err
 			}
+			kind, plural, endpoint, composition, _, _, _ := getCRDDetails(crdDetailsString)
+
+			KindPluralMap[kind] = plural
+			kindVersionMap[kind] = endpoint
+			compositionMap[kind] = composition
 		}
+		//}
 	}
 	//printMaps()
 	return nil
@@ -431,6 +438,7 @@ func buildCompositions(parentResourceKind string, parentResourceName string, par
 		return
 	}
 }
+
 func getAllNamespaces() []string {
 	var url1 string
 	url1 = fmt.Sprintf("https://%s:%s/%s/namespaces", serviceHost, servicePort, "api/v1")

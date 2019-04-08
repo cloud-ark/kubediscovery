@@ -61,7 +61,7 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
-	// Start collecting provenance
+	// Start building composition trees
 	go discovery.BuildCompositionTree()
 }
 
@@ -121,85 +121,110 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 		return nil, err
 	}
 
-	installExplainDescribePaths(s)
-
-	// Turning off registration of '/compositions' endpoints. We should use /describe endpoint	      // that supports query parameters for 'kind' and 'instance'.
-	// The installExplainDescribePaths function registers the /describe endpoint.
-	//installCompositionWebService(s)
-
-	//installExplainAlternate(s)
+	installKubePlusPaths(s)
 
 	return s, nil
 }
 
-func installExplainAlternate(discoveryServer *DiscoveryServer) {
+func installKubePlusPaths(discoveryServer *DiscoveryServer) {
 
 	path := "/apis/" + GroupName + "/" + GroupVersion
 
-	explainPath := path + "/explain"
-	fmt.Printf("Explain PATH:%s\n", explainPath)
-	//ws1 := getWebService()
-	ws1 := new(restful.WebService)
-	ws1.Path(explainPath).
-		Consumes(restful.MIME_JSON, restful.MIME_XML).
-		Produces(restful.MIME_JSON, restful.MIME_XML)
-	ws1.Route(ws1.GET(explainPath).To(handleExplain))
-	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
-
-}
-
-func installExplainDescribePaths(discoveryServer *DiscoveryServer) {
-
-	//path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/" + discovery.Namespace
-
-	path := "/apis/" + GroupName + "/" + GroupVersion
-
-	explainPath := path + "/explain"
-	fmt.Printf("Explain PATH:%s\n", explainPath)
 	ws1 := getWebService()
-	//ws1 := new(restful.WebService)
 	ws1.Path(path).
 		Consumes(restful.MIME_JSON, restful.MIME_XML).
 		Produces(restful.MIME_JSON, restful.MIME_XML)
 
-	ws1.Route(ws1.GET("/explain").To(handleExplain))
-	//discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+	ws1.Route(ws1.GET("/explain").To(handleExplainEndpoint))
+	ws1.Route(ws1.GET("/composition").To(handleCompositionEndpoint))
+	//ws1.Route(ws1.GET("/implementation_details").To(handleImplementationDetailsEndpoint))
+	//ws1.Route(ws1.GET("/usage").To(handleUsageEndpoint))
+	ws1.Route(ws1.GET("/man").To(handleManPageEndpoint))
 
-	//describePath := path + "/describe"
-	//fmt.Printf("Describe PATH:%s\n", describePath)
-	//ws2 := getWebService()
-	//ws2 := new(restful.WebService)
-	//ws2.Path(path).
-	//	Consumes(restful.MIME_JSON, restful.MIME_XML).
-	//	Produces(restful.MIME_JSON, restful.MIME_XML)
-	ws1.Route(ws1.GET("/composition").To(handleComposition))
 	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
 }
 
-func handleExplain(request *restful.Request, response *restful.Response) {
+func handleExplainEndpoint(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
-	//fmt.Printf("Kind:%s\n", customResourceKind)
 	customResourceKind, queryKind := getQueryKind(customResourceKind)
-	//fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
-	//fmt.Printf("Query Kind:%s\n", queryKind)
-	openAPISpec := discovery.GetOpenAPISpec(customResourceKind)
-	//fmt.Println("OpenAPI Spec:%v", openAPISpec)
-
+	openAPISpec, err := discovery.GetOpenAPISpec(customResourceKind)
 	queryResponse := ""
-	if openAPISpec != "" {
+	if err != nil {
+		queryResponse = "Error in retrieving OpenAPI Spec for Custom Resource:"
+	} else if openAPISpec != "" {
 		queryResponse = parseOpenAPISpec([]byte(openAPISpec), queryKind)
-		//fmt.Printf("Query response:%s\n", queryResponse)
 	}
 
 	response.Write([]byte(queryResponse))
 }
 
-func handleComposition(request *restful.Request, response *restful.Response) {
+func handleManPageEndpoint(request *restful.Request, response *restful.Response) {
+	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 
+	implementationDetails, err := discovery.GetImplementationDetails(customResourceKind)
+
+	if err != nil {
+		implementationDetails = "Error in retrieving implementation details for Custom Resource:"
+	}
+
+	fmt.Println("Implementation choices:%v", implementationDetails)
+
+	usageDetails, err := discovery.GetUsageDetails(customResourceKind)
+
+	if err != nil {
+		usageDetails = "Error in retrieving usage details for Custom Resource:"
+	}
+
+	fmt.Println("Usage guidelines:%v", usageDetails)
+
+	manPage := "NAME\n"
+	manPage = manPage + "=====\n"
+	manPage = manPage + "    " + customResourceKind + "\n\n"
+	manPage = manPage + "Implementation Constants\n"
+	manPage = manPage + "=========================\n"
+	manPage = manPage + implementationDetails + "\n\n"
+	manPage = manPage + "Usage Guidelines\n"
+	manPage = manPage + "=================\n"
+	manPage = manPage + usageDetails + "\n\n"
+
+	response.Write([]byte(manPage))
+}
+
+func handleImplementationDetailsEndpoint(request *restful.Request, response *restful.Response) {
+	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
+
+	implementationDetails, err := discovery.GetImplementationDetails(customResourceKind)
+
+	if err != nil {
+		implementationDetails = "Error in retrieving implementation details for Custom Resource:"
+	}
+
+	fmt.Println("Implementation details:%v", implementationDetails)
+
+	response.Write([]byte(implementationDetails))
+}
+
+func handleUsageEndpoint(request *restful.Request, response *restful.Response) {
+	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
+
+	usageDetails, err := discovery.GetUsageDetails(customResourceKind)
+
+	if err != nil {
+		usageDetails = "Error in retrieving usage details for Custom Resource:"
+	}
+
+	fmt.Println("Usage details:%v", usageDetails)
+
+	response.Write([]byte(usageDetails))
+}
+
+func handleCompositionEndpoint(request *restful.Request, response *restful.Response) {
 	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
 	namespace := request.QueryParameter(NAMESPACE_QUERY_PARAM)
-
 	/*
 			Note: We cannot generically convert kind to 'first letter capital' form
 			as there are Kinds like ReplicaSet in which the middle s needs to be 'S'
@@ -225,22 +250,6 @@ func handleComposition(request *restful.Request, response *restful.Response) {
 	response.Write([]byte(describeInfo))
 }
 
-func installCompositionWebService(discoveryServer *DiscoveryServer) {
-	for _, resourceKindPlural := range discovery.KindPluralMap {
-		namespaceToUse := discovery.Namespace
-		path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/"
-		path = path + namespaceToUse + "/" + strings.ToLower(resourceKindPlural)
-		fmt.Println("WS PATH:" + path)
-		ws := getWebService()
-		ws.Path(path).
-			Consumes(restful.MIME_JSON, restful.MIME_XML).
-			Produces(restful.MIME_JSON, restful.MIME_XML)
-		getPath := "/{resource-id}/compositions"
-		ws.Route(ws.GET(getPath).To(getCompositions))
-		discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws)
-	}
-}
-
 func getWebService() *restful.WebService {
 	ws := new(restful.WebService)
 	ws.Path("/apis")
@@ -250,38 +259,14 @@ func getWebService() *restful.WebService {
 	return ws
 }
 
-func getCompositions(request *restful.Request, response *restful.Response) {
-	resourceName := request.PathParameter("resource-id")
-	requestPath := request.Request.URL.Path
-	fmt.Printf("Printing Composition\n")
-	fmt.Printf("Resource Name:%s\n", resourceName)
-	fmt.Printf("Request Path:%s\n", requestPath)
-	//discovery.TotalClusterCompositions.PrintCompositions()
-	// Path looks as follows:
-	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
-	resourcePathSlice := strings.Split(requestPath, "/")
-	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
-	resourceNamespace := resourcePathSlice[5]
-	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
-
-	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName, resourceNamespace)
-	fmt.Printf("Compositions Info:%v", compositionsInfo)
-
-	response.Write([]byte(compositionsInfo))
-}
-
 func getQueryKind(input string) (string, string) {
-
 	// Input can be Postgres.PostgresSpec.UserSpec
 	// Return the last entry (i.e. UserSpec in above example)
 	customResourceKind := ""
 	queryKind := ""
-
 	parts := strings.Split(input, ".")
-
 	queryKind = parts[len(parts)-1]
 	customResourceKind = parts[0]
-
 	return customResourceKind, queryKind
 }
 
@@ -309,4 +294,53 @@ func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
 	retVal = string(result)
 
 	return retVal
+}
+
+func installExplainAlternate(discoveryServer *DiscoveryServer) {
+	path := "/apis/" + GroupName + "/" + GroupVersion
+	explainPath := path + "/explain"
+	fmt.Printf("Explain PATH:%s\n", explainPath)
+	//ws1 := getWebService()
+	ws1 := new(restful.WebService)
+	ws1.Path(explainPath).
+		Consumes(restful.MIME_JSON, restful.MIME_XML).
+		Produces(restful.MIME_JSON, restful.MIME_XML)
+	ws1.Route(ws1.GET(explainPath).To(handleExplainEndpoint))
+	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+}
+
+func installCompositionWebService(discoveryServer *DiscoveryServer) {
+	for _, resourceKindPlural := range discovery.KindPluralMap {
+		namespaceToUse := discovery.Namespace
+		path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/"
+		path = path + namespaceToUse + "/" + strings.ToLower(resourceKindPlural)
+		fmt.Println("WS PATH:" + path)
+		ws := getWebService()
+		ws.Path(path).
+			Consumes(restful.MIME_JSON, restful.MIME_XML).
+			Produces(restful.MIME_JSON, restful.MIME_XML)
+		getPath := "/{resource-id}/compositions"
+		ws.Route(ws.GET(getPath).To(getCompositions))
+		discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws)
+	}
+}
+
+func getCompositions(request *restful.Request, response *restful.Response) {
+	resourceName := request.PathParameter("resource-id")
+	requestPath := request.Request.URL.Path
+	fmt.Printf("Printing Composition\n")
+	fmt.Printf("Resource Name:%s\n", resourceName)
+	fmt.Printf("Request Path:%s\n", requestPath)
+	//discovery.TotalClusterCompositions.PrintCompositions()
+	// Path looks as follows:
+	// /apis/kubediscovery.cloudark.io/v1/namespaces/default/deployments/dep1/compositions
+	resourcePathSlice := strings.Split(requestPath, "/")
+	resourceKind := resourcePathSlice[6] // Kind is 7th element in the slice
+	resourceNamespace := resourcePathSlice[5]
+	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
+
+	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName, resourceNamespace)
+	fmt.Printf("Compositions Info:%v", compositionsInfo)
+
+	response.Write([]byte(compositionsInfo))
 }
