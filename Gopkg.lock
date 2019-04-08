@@ -489,8 +489,7 @@
   packages = [
     "pkg/apis/apiextensions",
     "pkg/apis/apiextensions/v1beta1",
-    "pkg/client/clientset/clientset/scheme",
-    "pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+    "pkg/client/clientset/clientset/scheme"
   ]
   revision = "b12c11a9bd7161c9a3d291caea157ca052ac4d49"
 
@@ -773,6 +772,12 @@
   revision = "ddee7171183be1d6f42cf9b3a3daf121fbf79595"
 
 [[projects]]
+  name = "k8s.io/klog"
+  packages = ["."]
+  revision = "71442cd4037d612096940ceb0f3fec3f7fff66e0"
+  version = "v0.2.0"
+
+[[projects]]
   name = "k8s.io/kube-openapi"
   packages = [
     "pkg/builder",
@@ -783,9 +788,15 @@
   ]
   revision = "8a9b82f00b3a86eac24681da3f9fe6c34c01cea2"
 
+[[projects]]
+  name = "sigs.k8s.io/yaml"
+  packages = ["."]
+  revision = "fd68e9863619f6ec2fdd8625fe1f02e7c877e480"
+  version = "v1.1.0"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "c00356525e426e2b15e86830cc38a452fc714bbed96f276818a2e0224ec60fc2"
+  inputs-digest = "4ad5b2def43de09c78e0d445c6247c67121363645286e78ddf7e04e02a2a3be0"
   solver-name = "gps-cdcl"
   solver-version = 1
