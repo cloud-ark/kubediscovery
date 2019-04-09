@@ -19,7 +19,7 @@ import (
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 )
 
-const GroupName = "kubeplus.cloudark.io"
+const GroupName = "platform-as-code"
 const GroupVersion = "v1"
 const KIND_QUERY_PARAM = "kind"
 const INSTANCE_QUERY_PARAM = "instance"
