@@ -38,6 +38,7 @@ var (
 	PV           string
 	ETCD_CLUSTER string
 	INGRESS      string
+	STATEFULSET  string
 )
 
 var (
@@ -70,6 +71,7 @@ func init() {
 	PV = "PersistentVolume"
 	ETCD_CLUSTER = "EtcdCluster"
 	INGRESS = "Ingress"
+	STATEFULSET = "StatefulSet"
 
 	KindPluralMap = make(map[string]string)
 	kindVersionMap = make(map[string]string)
@@ -109,6 +111,14 @@ func init() {
 	KindPluralMap[INGRESS] = "ingresses"
 	kindVersionMap[INGRESS] = "apis/extensions/v1beta1"
 	compositionMap[INGRESS] = []string{}
+
+	KindPluralMap[STATEFULSET] = "statefulsets"
+	kindVersionMap[STATEFULSET] = "apis/apps/v1"
+	compositionMap[STATEFULSET] = []string{"Pod", "ReplicaSet"}
+
+	KindPluralMap[CONFIG_MAP] = "configmaps"
+	kindVersionMap[CONFIG_MAP] = "api/v1"
+	compositionMap[CONFIG_MAP] = []string{}
 }
 
 func BuildCompositionTree() {

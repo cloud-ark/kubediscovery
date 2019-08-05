@@ -1,0 +1,76 @@
+module github.com/cloud-ark/kubediscovery
+
+go 1.12
+
+require (
+	bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c
+	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
+	github.com/PuerkitoBio/purell v1.0.0
+	github.com/PuerkitoBio/urlesc v0.0.0-20160726150825-5bd2802263f2
+	github.com/beorn7/perks v0.0.0-20160229213445-3ac7bf7a47d1
+	github.com/coreos/etcd v3.2.13+incompatible
+	github.com/coreos/go-semver v0.0.0-20150304020126-568e959cd898
+	github.com/coreos/go-systemd v0.0.0-20161114122254-48702e0da86b
+	github.com/davecgh/go-spew v0.0.0-20170626231645-782f4967f2dc
+	github.com/elazarl/go-bindata-assetfs v0.0.0-20150624150248-3dcc96556217
+	github.com/emicklei/go-restful v0.0.0-20170410110728-ff4f55a20633
+	github.com/emicklei/go-restful-swagger12 v0.0.0-20170208215640-dcef7f557305
+	github.com/evanphx/json-patch v0.0.0-20180525161421-94e38aa1586e
+	github.com/fsnotify/fsnotify v1.4.7
+	github.com/ghodss/yaml v0.0.0-20150909031657-73d445a93680
+	github.com/go-openapi/jsonpointer v0.0.0-20160704185906-46af16f9f7b1
+	github.com/go-openapi/jsonreference v0.0.0-20160704190145-13c6e3589ad9
+	github.com/go-openapi/spec v0.0.0-20180213232550-1de3e0542de6
+	github.com/go-openapi/swag v0.0.0-20170606142751-f3f9494671f9
+	github.com/gogo/protobuf v0.0.0-20170330071051-c0656edd0d9e
+	github.com/golang/glog v0.0.0-20141105023935-44145f04b68c
+	github.com/golang/protobuf v1.1.0
+	github.com/google/btree v0.0.0-20160524151835-7d79101e329e
+	github.com/google/gofuzz v0.0.0-20161122191042-44d81051d367
+	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
+	github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
+	github.com/hashicorp/golang-lru v0.0.0-20160207214719-a0d98a5f2880
+	github.com/hashicorp/hcl v0.0.0-20180404174102-ef8a98b0bbce
+	github.com/imdario/mergo v0.0.0-20141206190957-6633656539c1
+	github.com/inconshreveable/mousetrap v1.0.0
+	github.com/json-iterator/go v0.0.0-20180424004623-2ddf6d758266
+	github.com/magiconair/properties v1.8.0
+	github.com/mailru/easyjson v0.0.0-20170624190925-2f5df55504eb
+	github.com/matttproud/golang_protobuf_extensions v0.0.0-20150406173934-fc2b8d3a73c4
+	github.com/mitchellh/mapstructure v0.0.0-20180715050151-f15292f7a699
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+	github.com/modern-go/reflect2 v0.0.0-20180228065516-1df9eeb2bb81
+	github.com/pborman/uuid v0.0.0-20150603214016-ca53cad383ca
+	github.com/pelletier/go-toml v1.2.0
+	github.com/petar/GoLLRB v0.0.0-20130427215148-53be0d36a84c
+	github.com/peterbourgon/diskv v2.0.1+incompatible
+	github.com/prometheus/client_golang v0.0.0-20170531130054-e7e903064f5e
+	github.com/prometheus/client_model v0.0.0-20150212101744-fa8ad6fec335
+	github.com/prometheus/common v0.0.0-20170427095455-13ba4ddd0caa
+	github.com/prometheus/procfs v0.0.0-20170519190837-65c1f6f8f0fc
+	github.com/spf13/afero v1.1.1
+	github.com/spf13/cast v1.2.0
+	github.com/spf13/cobra v0.0.0-20180319062004-c439c4fa0937
+	github.com/spf13/jwalterweatherman v0.0.0-20180814060501-14d3d4c51834
+	github.com/spf13/pflag v1.0.1
+	github.com/spf13/viper v1.1.0
+	github.com/ugorji/go v0.0.0-20170107133203-ded73eae5db7
+	golang.org/x/crypto v0.0.0-20180222182404-49796115aa4b
+	golang.org/x/net v0.0.0-20170809000501-1c05540f6879
+	golang.org/x/sys v0.0.0-20171031081856-95c657629925
+	golang.org/x/text v0.0.0-20170810154203-b19bf474d317
+	golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	google.golang.org/genproto v0.0.0-20170731182057-09f6ed296fc6
+	google.golang.org/grpc v1.7.5
+	gopkg.in/inf.v0 v0.9.0
+	gopkg.in/natefinch/lumberjack.v2 v2.0.0-20150622162204-20b71e5b60d7
+	gopkg.in/yaml.v2 v2.0.0-20170721113624-670d4cfef054
+	k8s.io/api v0.0.0-20180605221252-4c8191c9c7bf
+	k8s.io/apiextensions-apiserver v0.0.0-20180822171001-b12c11a9bd71
+	k8s.io/apimachinery v0.0.0-20180605220555-521145febf93
+	k8s.io/apiserver v0.0.0-20180605224354-0553b9748924
+	k8s.io/client-go v0.0.0-20180605221845-ddee7171183b
+	k8s.io/klog v0.2.0
+	k8s.io/kube-openapi v0.0.0-20180531204156-8a9b82f00b3a
+	sigs.k8s.io/yaml v1.1.0
+)
