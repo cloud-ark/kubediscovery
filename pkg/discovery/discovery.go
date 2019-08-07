@@ -244,7 +244,7 @@ func getResourceKinds() []string {
 func getResourceNames(resourceKind, namespace string) []MetaDataAndOwnerReferences {
 	resourceApiVersion := kindVersionMap[resourceKind]
 	resourceKindPlural := KindPluralMap[resourceKind]
-	content := queryAPIServer(resourceApiVersion, resourceKindPlural, namespace)
+	content := queryResources(resourceApiVersion, resourceKindPlural, namespace)
 	metaDataAndOwnerReferenceList := parseMetaData(content)
 	return metaDataAndOwnerReferenceList
 }
@@ -426,7 +426,7 @@ func buildCompositions(parentResourceKind string, parentResourceName string, par
 			childResourceApiVersion := kindVersionMap[childResourceKind]
 			var content []byte
 			var metaDataAndOwnerReferenceList []MetaDataAndOwnerReferences
-			content = queryAPIServer(childResourceApiVersion, childKindPlural, parentNamespace)
+			content = queryResources(childResourceApiVersion, childKindPlural, parentNamespace)
 			metaDataAndOwnerReferenceList = parseMetaData(content)
 
 			childrenList := filterChildren(&metaDataAndOwnerReferenceList, parentResourceName)
@@ -484,7 +484,16 @@ func getAllNamespaces() []string {
 	return parseNamespacesResponse(resp_body)
 }
 
-func queryAPIServer(resourceApiVersion, resourcePlural, namespace string) []byte {
+func (cp *ClusterCompositions) QueryResource(resourceKind, resourceName, namespace string) []byte {
+	resourceApiVersion := kindVersionMap[resourceKind]
+	resourceKindPlural := KindPluralMap[resourceKind]
+	url1 := fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s/%s", serviceHost, servicePort, resourceApiVersion, namespace, resourceKindPlural, resourceName)
+	fmt.Printf("Resource Query URL:%s\n", url1)
+	contents := queryAPIServer(url1)
+	return contents
+}
+
+func queryResources(resourceApiVersion, resourcePlural, namespace string) []byte {
 	var url1 string
 	if !strings.Contains(resourceApiVersion, resourcePlural) {
 		url1 = fmt.Sprintf("https://%s:%s/%s/namespaces/%s/%s", serviceHost, servicePort, resourceApiVersion, namespace, resourcePlural)
@@ -492,6 +501,11 @@ func queryAPIServer(resourceApiVersion, resourcePlural, namespace string) []byte
 		url1 = fmt.Sprintf("https://%s:%s/%s", serviceHost, servicePort, resourceApiVersion)
 	}
 	//fmt.Printf("Url:%s\n",url1)
+	contents := queryAPIServer(url1)
+	return contents
+}
+
+func queryAPIServer(url1 string) []byte {
 	caToken := getToken()
 	caCertPool := getCACert()
 	u, err := url.Parse(url1)

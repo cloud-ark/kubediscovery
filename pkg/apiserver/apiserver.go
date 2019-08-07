@@ -126,6 +126,22 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 	return s, nil
 }
 
+func handleResourceDetailsEndpoint(request *restful.Request, response *restful.Response) {
+
+	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
+	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
+	namespace := request.QueryParameter(NAMESPACE_QUERY_PARAM)
+
+	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance)
+	if namespace == "" {
+		namespace = "default"
+	}
+	resourceInfo := discovery.TotalClusterCompositions.QueryResource(resourceKind, resourceInstance, namespace)
+	fmt.Printf("Resource Info:%v\n", resourceInfo)
+
+	response.Write([]byte(resourceInfo))
+}
+
 func installKubePlusPaths(discoveryServer *DiscoveryServer) {
 
 	path := "/apis/" + GroupName + "/" + GroupVersion
@@ -140,6 +156,7 @@ func installKubePlusPaths(discoveryServer *DiscoveryServer) {
 	//ws1.Route(ws1.GET("/implementation_details").To(handleImplementationDetailsEndpoint))
 	//ws1.Route(ws1.GET("/usage").To(handleUsageEndpoint))
 	ws1.Route(ws1.GET("/man").To(handleManPageEndpoint))
+	ws1.Route(ws1.GET("/resourceDetails").To(handleResourceDetailsEndpoint))
 
 	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
 }
