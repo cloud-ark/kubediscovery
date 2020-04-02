@@ -39,6 +39,8 @@ var (
 	ETCD_CLUSTER string
 	INGRESS      string
 	STATEFULSET  string
+	DAEMONSET    string
+	RC           string
 )
 
 var (
@@ -72,6 +74,8 @@ func init() {
 	ETCD_CLUSTER = "EtcdCluster"
 	INGRESS = "Ingress"
 	STATEFULSET = "StatefulSet"
+	DAEMONSET = "DaemonSet"
+	RC = "ReplicationController"
 
 	KindPluralMap = make(map[string]string)
 	kindVersionMap = make(map[string]string)
@@ -87,6 +91,18 @@ func init() {
 	KindPluralMap[REPLICA_SET] = "replicasets"
 	kindVersionMap[REPLICA_SET] = "apis/extensions/v1beta1"
 	compositionMap[REPLICA_SET] = []string{"Pod"}
+
+	KindPluralMap[DAEMONSET] = "daemonsets"
+	kindVersionMap[DAEMONSET] = "apis/extensions/v1beta1"
+	compositionMap[DAEMONSET] = []string{"Pod"}
+
+	KindPluralMap[DAEMONSET] = "daemonsets"
+	kindVersionMap[DAEMONSET] = "apis/apps/v1"
+	compositionMap[DAEMONSET] = []string{"Pod"}
+
+	KindPluralMap[RC] = "replicationcontrollers"
+	kindVersionMap[RC] = "api/v1"
+	compositionMap[RC] = []string{"Pod"}
 
 	KindPluralMap[POD] = "pods"
 	kindVersionMap[POD] = "api/v1"
