@@ -22,7 +22,6 @@ You can read more about our goals with Kubediscovery in
 [this blog post](https://medium.com/@cloudark/kubediscovery-aggregated-api-server-to-learn-more-about-kubernetes-custom-resources-18202a1c4aef).
 
 
-
 ## How it works?
 
 The ‘composition’ endpoint is used for obtaining dynamic composition tree of a Custom Resource instance in terms of its underlying resource instances.
@@ -163,19 +162,21 @@ kubectl get --raw "/apis/kubeplus.cloudark.io/v1/composition?kind=Postgres&insta
 
    `$ eval $(minikube docker-env)`
 
-3) Install/Vendor in dependencies:
+3) Use Go version 1.10.2
+
+4) Install/Vendor in dependencies:
 
    `$ dep ensure`
 
-4) Build the API Server container image:
+5) Build the API Server container image:
 
    `$ ./build-local-discovery-artifacts.sh`
 
-5) Deploy the API Server in your cluster:
+6) Deploy the API Server in your cluster:
 
    `$ ./deploy-local-discovery-artifacts.sh`
 
-6) Follow steps 3-10 listed under Try it section above.
+7) Follow steps 3-10 listed under Try it section above.
 
 
 
