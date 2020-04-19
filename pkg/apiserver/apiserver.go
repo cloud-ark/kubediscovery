@@ -61,8 +61,10 @@ func init() {
 		&metav1.APIGroup{},
 		&metav1.APIResourceList{},
 	)
-	// Start building composition trees
-	go discovery.BuildCompositionTree()
+
+	// Start building composition trees.
+	//namespace := "" // all namespaces
+	//go discovery.BuildCompositionTree(namespace)
 }
 
 type ExtraConfig struct {
@@ -242,29 +244,19 @@ func handleCompositionEndpoint(request *restful.Request, response *restful.Respo
 	resourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	resourceInstance := request.QueryParameter(INSTANCE_QUERY_PARAM)
 	namespace := request.QueryParameter(NAMESPACE_QUERY_PARAM)
-	/*
-			Note: We cannot generically convert kind to 'first letter capital' form
-			as there are Kinds like ReplicaSet in which the middle s needs to be 'S'
-			and not 's'. So commenting out below. So we are going to require providing
-		        the exact Kind name such as: Pod, Deployment, Postgres, etc.
-			Also note that we are going to require input as singular Kind Name and not
-			plural (as we had with the compositions endpoint)
-			resourceKind = strings.ToLower(resourceKind)
-			parts := strings.Split(resourceKind, "")
-			firstPart := string(parts[0])
-			firstPart = strings.ToUpper(firstPart)
-			secondPart := strings.Join(parts[1:], "")
-			resourceKind = firstPart + secondPart
-	*/
-
 	fmt.Printf("Kind:%s, Instance:%s\n", resourceKind, resourceInstance)
 	if namespace == "" {
 		namespace = "default"
 	}
-	describeInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceInstance, namespace)
-	fmt.Printf("Composition:%v\n", describeInfo)
 
-	response.Write([]byte(describeInfo))
+	discovery.BuildCompositionTree(namespace)
+
+	compositionInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind,
+																		  resourceInstance,
+																		  namespace)
+	fmt.Printf("Composition:%v\n", compositionInfo)
+
+	response.Write([]byte(compositionInfo))
 }
 
 func getWebService() *restful.WebService {
@@ -311,35 +303,6 @@ func parseOpenAPISpec(openAPISpec []byte, customResourceKind string) string {
 	retVal = string(result)
 
 	return retVal
-}
-
-func installExplainAlternate(discoveryServer *DiscoveryServer) {
-	path := "/apis/" + GroupName + "/" + GroupVersion
-	explainPath := path + "/explain"
-	fmt.Printf("Explain PATH:%s\n", explainPath)
-	//ws1 := getWebService()
-	ws1 := new(restful.WebService)
-	ws1.Path(explainPath).
-		Consumes(restful.MIME_JSON, restful.MIME_XML).
-		Produces(restful.MIME_JSON, restful.MIME_XML)
-	ws1.Route(ws1.GET(explainPath).To(handleExplainEndpoint))
-	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
-}
-
-func installCompositionWebService(discoveryServer *DiscoveryServer) {
-	for _, resourceKindPlural := range discovery.KindPluralMap {
-		namespaceToUse := discovery.Namespace
-		path := "/apis/" + GroupName + "/" + GroupVersion + "/namespaces/"
-		path = path + namespaceToUse + "/" + strings.ToLower(resourceKindPlural)
-		fmt.Println("WS PATH:" + path)
-		ws := getWebService()
-		ws.Path(path).
-			Consumes(restful.MIME_JSON, restful.MIME_XML).
-			Produces(restful.MIME_JSON, restful.MIME_XML)
-		getPath := "/{resource-id}/compositions"
-		ws.Route(ws.GET(getPath).To(getCompositions))
-		discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws)
-	}
 }
 
 func getCompositions(request *restful.Request, response *restful.Response) {
