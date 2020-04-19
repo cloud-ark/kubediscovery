@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 
@@ -14,6 +13,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+var etcdServiceURL string
+
+func init() {
+	etcdServiceURL = "http://localhost:2379"
+}
 
 func getCRDNames(crdListString string) []string {
 	var operatorMapList []map[string]map[string]interface{}
@@ -180,7 +185,9 @@ func GetOpenAPISpec_prev(customResourceKind string) string {
 		fmt.Printf("Error:%s\n", err.Error())
 	}
 
-	configMap, err := kubeClient.CoreV1().ConfigMaps("default").Get(configMapName, metav1.GetOptions{})
+	configMap, err := kubeClient.CoreV1().ConfigMaps("default").Get(context.TODO(), 
+																	configMapName, 
+																	metav1.GetOptions{})
 
 	if err != nil {
 		fmt.Printf("Error:%s\n", err.Error())
@@ -221,7 +228,9 @@ func readConfigMap(implementationDetailsString string) (string, error) {
 
 	fmt.Printf("Namespace:%s, configMapName:%s, dataFieldName:%s", namespace, configMapName, dataFieldName)
 
-	configMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(configMapName, metav1.GetOptions{})
+	configMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(),
+																	configMapName, 
+																	metav1.GetOptions{})
 
 	if err != nil {
 		fmt.Printf("Error:%s\n", err.Error())
@@ -243,7 +252,7 @@ func queryETCDNodes(resourceKey string) ([]string, error) {
 	}
 	c, err := client.New(cfg)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	kapi := client.NewKeysAPI(c)
 
@@ -268,7 +277,7 @@ func queryETCD(resourceKey string) (string, error) {
 	}
 	c, err := client.New(cfg)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 	kapi := client.NewKeysAPI(c)
 

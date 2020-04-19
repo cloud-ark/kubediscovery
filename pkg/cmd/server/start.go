@@ -24,7 +24,8 @@ type DiscoveryServerOptions struct {
 func NewDiscoveryServerOptions(out, errOut io.Writer) *DiscoveryServerOptions {
 	o := &DiscoveryServerOptions{
 		RecommendedOptions: genericoptions.NewRecommendedOptions(defaultEtcdPathPrefix,
-			apiserver.Codecs.LegacyCodec(apiserver.SchemeGroupVersion)),
+			apiserver.Codecs.LegacyCodec(apiserver.SchemeGroupVersion),
+			&genericoptions.ProcessInfo{}),
 		StdOut: out,
 		StdErr: errOut,
 	}
@@ -75,7 +76,7 @@ func (o *DiscoveryServerOptions) Config() (*apiserver.Config, error) {
 	}
 
 	serverConfig := genericapiserver.NewRecommendedConfig(apiserver.Codecs)
-	if err := o.RecommendedOptions.ApplyTo(serverConfig, apiserver.Scheme); err != nil {
+	if err := o.RecommendedOptions.ApplyTo(serverConfig); err != nil {
 		return nil, err
 	}
 

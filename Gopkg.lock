@@ -490,6 +490,7 @@
     "pkg/apis/apiextensions",
     "pkg/apis/apiextensions/v1beta1",
     "pkg/client/clientset/clientset/scheme"
+    "pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
   ]
   revision = "b12c11a9bd7161c9a3d291caea157ca052ac4d49"
 
