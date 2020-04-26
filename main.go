@@ -4,23 +4,43 @@ import (
 	"flag"
 	"os"
 	"fmt"
-
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 )
 
 func main() {
-
-	if len(os.Args) == 4 {
-		kind := os.Args[1]
-		instance := os.Args[2]
-		namespace := os.Args[3]
-		discovery.BuildCompositionTree(namespace)
-		composition := discovery.TotalClusterCompositions.GetCompositions(kind, 
-																		  instance, 
-																		  namespace)
-		fmt.Printf("%s\n", composition)
+	if len(os.Args) == 5  || len(os.Args) == 3 {
+		var kind, instance, namespace string
+		// kubediscovery composition Moodle moodle1 default
+		// kubediscovery relation Moodle moodle1 default
+		// kubediscovery man Moodle
+		commandType := os.Args[1]
+		if commandType == "composition" {
+			kind = os.Args[2]
+			instance = os.Args[3]
+			namespace = os.Args[4]
+			discovery.BuildCompositionTree(namespace)
+			composition := discovery.TotalClusterCompositions.GetCompositions(kind,
+																			  instance,
+																			  namespace)
+			fmt.Printf("%s\n", composition)
+		}
+		if commandType == "relation" {
+			kind = os.Args[2]
+			instance = os.Args[3]
+			namespace = os.Args[4]
+			relatives := discovery.GetRelatives(kind, instance, namespace)
+			fmt.Printf("%s\n", relatives)
+		}
+		if commandType == "man" {
+			kind := os.Args[2]
+			fmt.Printf("TODO: Implement man endpoint: %s\n", kind)
+		}
+		if commandType != "composition" && commandType != "relation" && commandType != "man" {
+			fmt.Printf("Unknown command specified:%s\n", commandType)
+			fmt.Printf("Allowed values: [composition, relation, man]\n")
+		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")
 		stopCh := genericapiserver.SetupSignalHandler()

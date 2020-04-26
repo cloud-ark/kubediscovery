@@ -12,20 +12,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"path/filepath"
-
 	"gopkg.in/yaml.v2"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-	"k8s.io/client-go/tools/clientcmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
 var (
@@ -36,9 +29,6 @@ var (
 	etcdservers string
 	caToken		[]byte
 	caCertPool	*cert.CertPool
-
-	cfg *rest.Config
-	err error
 )
 
 func init() {
@@ -54,32 +44,6 @@ func init() {
 	if err != nil {
 		panic(err.Error())
 	}
-}
-
-func buildConfig() (*rest.Config, error) {
-
-	var cfg *rest.Config
-	var err error
-	if home := homeDir(); home != "" {
-		kubeconfig := filepath.Join(home, ".kube", "config")
-		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
-		if err != nil {
-			fmt.Printf("kubeconfig error:%s\n", err.Error())
-			fmt.Printf("Trying inClusterConfig..")
-			cfg, err = rest.InClusterConfig()
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-	return cfg, nil
-}
-
-func homeDir() string {
-	if h := os.Getenv("HOME"); h != "" {
-		return h
-	}
-	return os.Getenv("USERPROFILE") // windows
 }
 
 func BuildCompositionTree(namespace string) {
@@ -196,26 +160,25 @@ func getResourceKinds() []string {
 	return resourceKindSlice
 }
 
-func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion, namespace string) []MetaDataAndOwnerReferences {
+func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion,
+						 namespace string) []MetaDataAndOwnerReferences {
 
 	metaDataAndOwnerReferenceList := []MetaDataAndOwnerReferences{}
 
-	parts := strings.Split(resourceApiVersion, "/")
-	apiPart := parts[len(parts)-1]
 	//fmt.Printf("Res:%s, Group:%s, Version:%s\n", resourceKindPlural, resourceGroup, apiPart)
 
-	if resourceKindPlural == "" || apiPart == "" {
+	if resourceKindPlural == "" || resourceApiVersion == "" {
 		return metaDataAndOwnerReferenceList
 	}
 
-	res := schema.GroupVersionResource{Group: resourceGroup, 
-									   Version: apiPart, 
-									   Resource: resourceKindPlural}
-
-	dynamicClient, err := dynamic.NewForConfig(cfg)
+	dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return metaDataAndOwnerReferenceList
 	}
+
+	res := schema.GroupVersionResource{Group: resourceGroup,
+									   Version: resourceApiVersion,
+									   Resource: resourceKindPlural}
 
 	list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
@@ -246,9 +209,7 @@ func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion, 
 }
 
 func getTopLevelResourceMetaData(resourceKind, namespace string) []MetaDataAndOwnerReferences {
-	resourceApiVersion := kindVersionMap[resourceKind]
-	resourceKindPlural := KindPluralMap[resourceKind]
-	resourceGroup := kindGroupMap[resourceKind]
+	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(resourceKind)
 
 	metaDataAndOwnerReferenceList := getResourceMetaData(resourceKindPlural,
 														 resourceGroup,
@@ -420,9 +381,8 @@ func buildCompositions(parentResourceKind string, parentResourceName string, par
 
 		for _, childResourceKind := range childResourceKindList {
 			childResourceKind = strings.TrimSpace(childResourceKind)
-			childKindPlural := KindPluralMap[childResourceKind]
-			childResourceApiVersion := kindVersionMap[childResourceKind]
-			childResourceGroup := kindGroupMap[childResourceKind]
+			childKindPlural, _, childResourceApiVersion, childResourceGroup := getKindAPIDetails(childResourceKind)
+
 			//var content []byte
 			var metaDataAndOwnerReferenceList []MetaDataAndOwnerReferences
 
