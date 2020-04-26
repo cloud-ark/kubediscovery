@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"sync"
+	"strings"
 )
 
 // Used for unmarshalling JSON output from the main API server
@@ -62,6 +63,7 @@ var (
 	kindVersionMap map[string]string
 	kindGroupMap map[string]string
 	compositionMap map[string][]string
+	relationshipMap map[string][]string
 
 	REPLICA_SET  string
 	DEPLOYMENT   string
@@ -102,6 +104,7 @@ func init() {
 	kindVersionMap = make(map[string]string) 
 	compositionMap = make(map[string][]string, 0)
 	kindGroupMap = make(map[string]string)
+	relationshipMap = make(map[string][]string)
 
 	// set basic data types
 	KindPluralMap[DEPLOYMENT] = "deployments"
@@ -133,6 +136,7 @@ func init() {
 	kindVersionMap[POD] = "api/v1"
 	kindGroupMap[POD] = ""
 	compositionMap[POD] = []string{}
+	relationshipMap[POD] = []string{}
 
 	KindPluralMap[PDB] = "poddisruptionbudgets"
 	kindVersionMap[PDB] = "apis/policy/v1beta1"
@@ -143,6 +147,10 @@ func init() {
 	kindVersionMap[SERVICE] = "api/v1"
 	kindGroupMap[SERVICE] = ""
 	compositionMap[SERVICE] = []string{}
+	serviceRelationships := make([]string,0)
+	serviceRel := "label, on:Pod;Deployment, value:instance.spec.selector"
+	serviceRelationships = append(serviceRelationships, serviceRel)
+	relationshipMap[SERVICE] = serviceRelationships
 
 	KindPluralMap[SECRET] = "secrets"
 	kindVersionMap[SECRET] = "api/v1"
@@ -173,4 +181,15 @@ func init() {
 	kindVersionMap[CONFIG_MAP] = "api/v1"
 	kindGroupMap[CONFIG_MAP] = ""
 	compositionMap[CONFIG_MAP] = []string{}
+}
+
+func getKindAPIDetails(kind string) (string, string, string, string) {
+	kindplural := KindPluralMap[kind]
+	kindResourceApiVersion := kindVersionMap[kind]
+	kindResourceGroup := kindGroupMap[kind]
+
+	parts := strings.Split(kindResourceApiVersion, "/")
+	kindAPI := parts[len(parts)-1]
+
+	return kindplural, kindResourceApiVersion, kindAPI, kindResourceGroup
 }

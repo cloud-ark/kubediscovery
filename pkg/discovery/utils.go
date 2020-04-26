@@ -1,13 +1,57 @@
 package discovery
 
 import (
+	"os"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-
+	"path/filepath"
 	"github.com/coreos/etcd/client"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
+
+var (
+	cfg *rest.Config
+	err error
+)
+
+func init() {
+	cfg, err = buildConfig()
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
+func buildConfig() (*rest.Config, error) {
+	if home := homeDir(); home != "" {
+		kubeconfig := filepath.Join(home, ".kube", "config")
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			fmt.Printf("kubeconfig error:%s\n", err.Error())
+			fmt.Printf("Trying inClusterConfig..")
+			cfg, err = rest.InClusterConfig()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return cfg, nil
+}
+
+func homeDir() string {
+	if h := os.Getenv("HOME"); h != "" {
+		return h
+	}
+	return os.Getenv("USERPROFILE") // windows
+}
+
+func getDynamicClient() (dynamic.Interface, error) {
+	dynamicClient, err := dynamic.NewForConfig(cfg)
+	return dynamicClient, err
+}
 
 func getComposition1(kind, name, status string, compositionTree *[]CompositionTreeNode) Composition {
 	var compositionString string
