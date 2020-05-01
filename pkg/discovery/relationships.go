@@ -3,6 +3,7 @@ package discovery
 import (
 	"strings"
 	"fmt"
+	"strconv"
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -10,8 +11,8 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-func GetRelatives(kind, instance, namespace string) []string{
-	relatives := make([]string, 0) //siblings entry: relationship: label, kind: Pod, name: <Pod-name>
+func GetRelatives(level int, kind, instance, namespace string) []string{
+	relatives := make([]string, 0)
 	relStringList := relationshipMap[kind]
 	if len(relStringList) == 0 {
 		kindList := findRelatedKinds(kind)
@@ -27,15 +28,38 @@ func GetRelatives(kind, instance, namespace string) []string{
 			}
 		}
 	} else {
-		relatives = findRelatives(kind, instance, namespace, relStringList)
+		level = level + 1
+		//fmt.Printf("%d\n", level)
+		exists := checkExistence(kind, instance, namespace)
+		if exists {
+			relatives = findRelatives(level, kind, instance, namespace, relStringList)
+		}
 	}
 	return relatives
+}
+
+func checkExistence(kind, instance, namespace string) bool {
+	dynamicClient, err := getDynamicClient()
+	if err != nil {
+		return false
+	}
+	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
+	res := schema.GroupVersionResource{Group: resourceGroup,
+									   Version: resourceApiVersion,
+									   Resource: resourceKindPlural}
+	_, err = dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(),
+																			 instance,
+																	   		 metav1.GetOptions{})
+	if err != nil {
+		return false
+	}
+	return true
 }
 
 func findInverseRelatives(kind, instance, namespace, targetKind string, relStringList []string) []string {
 	relatives := make([]string, 0)
 	for _, relString := range relStringList {
-		relType, _, _ := parseRelationship(relString)
+		relType, _, _, _ := parseRelationship(relString)
 		//fmt.Printf("TargetKinds:%s\n", targetKindList)
 		//for _, targetKind := range targetKindList {
 			//fmt.Printf("%s, %s, %s\n", relType, relValue, targetKind)
@@ -48,6 +72,9 @@ func findInverseRelatives(kind, instance, namespace, targetKind string, relStrin
 					relatives = append(relatives, relativeEntry)
 				}
 			}
+			if relType == "specProperty" {
+
+			}
 		//}
 	}
 	return relatives
@@ -57,7 +84,7 @@ func findRelatedKinds(kind string) []string{
 	relatedKinds := make([]string, 0)
 	for key, relStringList := range relationshipMap {
 		for _, relString := range relStringList {
-			_, _, targetKindList := parseRelationship(relString)
+			_, _, _, targetKindList := parseRelationship(relString)
 			for _, targetKind := range targetKindList {
 				if targetKind == kind {
 					relatedKinds = append(relatedKinds, key)
@@ -68,34 +95,205 @@ func findRelatedKinds(kind string) []string{
 	return relatedKinds
 }
 
-func findRelatives(kind, instance, namespace string, relStringList []string) []string {
+func findRelatives(level int, kind, instance, namespace string, relStringList []string) []string {
 	relatives := make([]string, 0)
 	for _, relString := range relStringList {
-		relType, _, targetKindList := parseRelationship(relString)
+		relType, lhs, rhs, targetKindList := parseRelationship(relString)
 		//fmt.Printf("TargetKinds:%s\n", targetKindList)
 		for _, targetKind := range targetKindList {
 			//fmt.Printf("%s, %s, %s\n", relType, relValue, targetKind)
 			if relType == "label" {
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
+				//fmt.Printf("SelectorLabelMap:%s\n", selectorLabelMap)
 				relativesNames := searchLabels(selectorLabelMap, targetKind, namespace)
-				for _, relativeName := range relativesNames {
-					relativeEntry := "kind:" + targetKind + ", name:" + relativeName +  " relationship-type:label" 
-					relatives = append(relatives, relativeEntry)
+				//fmt.Printf("Label RelativesNames:%s\n", relativesNames)
+				relativesLabel := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				for _, rel := range relativesLabel {
+					relatives = append(relatives, rel)
 				}
+			}
+			if relType == "specproperty" {
+				relativesNames := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind)
+				//fmt.Printf("SpecProperty RelativesNames:%s\n", relativesNames)
+				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				for _, rel := range relativesSpec {
+					relatives = append(relatives, rel)
+				}			
 			}
 		}
 	}
 	return relatives
 }
 
-func parseRelationship(relString string) (string, string, []string) {
+func prepareAndSearchNextLevel(level int, relativeNames []string, targetKind, namespace, relType string) []string {
+	relatives := make([]string,0)
+	for _, relativeName := range relativeNames {
+		levelStr := strconv.Itoa(level)
+		relativeEntry := "Level:" + levelStr + ", kind:" + targetKind + ", name:" + relativeName +  " relationship-type:" + relType
+		//fmt.Printf("%s\n", relativeEntry)
+		relatives = append(relatives, relativeEntry)
+	}
+	var subrelatives []string
+	for _, relativeName := range relativeNames {
+		subrelatives = GetRelatives(level, targetKind, relativeName, namespace)
+	}
+	for _, subrelative := range subrelatives {
+		relatives = append(relatives, subrelative)
+	}
+	return relatives
+}
+
+func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind string) []string {
+	relativesNames := make([]string, 0)
+	if lhs == "env" {
+		relativesNames = searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind)
+	}
+	return relativesNames
+}
+
+func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []string {
+	relativesNames := make([]string, 0)
+	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
+	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
+									   Version: lhsResApiVersion,
+									   Resource: lhsResKindPlural}
+	dynamicClient, err := getDynamicClient()
+	if err != nil {
+		return relativesNames
+	}
+	instanceObj, err := dynamicClient.Resource(lhsRes).Namespace(namespace).Get(context.TODO(),
+																			 	instance,
+																	   		 	metav1.GetOptions{})
+	if err != nil {
+		return relativesNames
+	}
+	lhsContent := instanceObj.UnstructuredContent()
+	//jsonContent, _ := instanceObj.MarshalJSON()
+	//fmt.Printf("JSON Content:%s\n", string(jsonContent))
+	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
+	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
+									   Version: rhsResApiVersion,
+									   Resource: rhsResKindPlural}
+	rhsInstList, err := dynamicClient.Resource(rhsRes).Namespace(namespace).List(context.TODO(),
+																	   metav1.ListOptions{})
+	if err != nil {
+		return relativesNames
+	}
+	containerList, ok, _ := unstructured.NestedSlice(lhsContent, "spec", "containers")
+	if ok {
+		for _, cont := range containerList {
+			container := cont.(map[string]interface{})
+			envVarList, ok, _ := unstructured.NestedSlice(container,"env")
+			if ok {
+				for _, envVar := range envVarList {
+					envMap := envVar.(map[string]interface{})
+					//envName := envMap["name"]
+					envValue := envMap["value"]
+					//fmt.Printf("Name:%s, Value:%s\n", envName, envValue)
+					for _, unstructuredObj := range rhsInstList.Items {
+						if rhs == "name" {
+							rhsInstanceName := unstructuredObj.GetName()
+							if envValue == rhsInstanceName {
+								//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
+								relativesNames = append(relativesNames, rhsInstanceName)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return relativesNames
+}
+
+func checkContent(lhsContent interface{}, instanceName string) bool {
+	//var content interface{}
+	_, ok1 := lhsContent.(map[string]interface{})
+	if ok1 {
+		content := lhsContent.(map[string]interface{})
+		for _, value := range content {
+			//fmt.Printf("Key: Value:%s\n", key, value)
+			stringVal, ok := value.(string)
+			if ok {
+				//if instanceName == "wordpress-mysql" {
+				//	fmt.Printf("Key:%s, Value:%s, InstanceName:%s\n", key, value, instanceName)				
+				//}
+				//if strings.Contains(stringVal, instanceName)  {
+				if stringVal == instanceName {
+					fmt.Printf("*** FOUND *** value:%s\n", stringVal)
+					return true
+				}
+			} else {
+				return checkContent(value, instanceName)
+			}
+		}
+	}
+	_, ok2 := lhsContent.([]string)
+	if ok2 {
+		content := lhsContent.([]string)
+		for _, value := range content {
+			//fmt.Printf("Key: Value:%s\n", key, value)
+			//_, ok := value.(string)
+			//if ok {
+				//if instanceName == "wordpress-mysql" {
+				//	fmt.Printf("Key:%s, Value:%s, InstanceName:%s\n", key, value, instanceName)				
+				//}
+				if strings.Contains(value, instanceName) {
+					parts := strings.Split(value, ":")
+					for _, part := range parts {
+						fmt.Printf("--- FOUND --- value:%s part:%s\n", value, part)
+						return true
+					}
+				}
+			//} else {
+			//	return checkContent(value, instanceName)
+			//}
+		}
+	}
+	/*for key, value := range lhsContent {
+		fmt.Printf("Value:%s\n", value)
+		_, ok := value.(string)
+		if ok {
+			if instanceName == "wordpress-mysql" {
+				fmt.Printf("Key:%s, Value:%s, InstanceName:%s\n", key, value, instanceName)				
+			}
+			if value == instanceName {
+				return true
+			}
+		}
+		_, ok = value.(map[string]interface{})
+		if ok {
+			return checkContent(value.(map[string]interface{}), instanceName)
+		}
+	}*/
+	return false
+}
+
+func parseRelationship(relString string) (string, string, string, []string) {
+	// Update this method to parse out the kinds based on relationship types: label vs. specproperty
 	targetKindList := make([]string, 0)
 	parts := strings.Split(relString, ",")
 	relType := strings.TrimSpace(parts[0])
-	relValue := strings.Split(strings.TrimSpace(parts[2]), ":")[1]
-	targetKinds := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
-	targetKindList = strings.Split(targetKinds, ";")
-	return relType, relValue, targetKindList
+	var lhs, rhs string
+	if relType == "label" {
+		targetKind := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
+		lhs = strings.Split(strings.TrimSpace(parts[2]), ":")[1]
+		//targetKindList = strings.Split(targetKinds, ";")
+		targetKindList = append(targetKindList, targetKind)
+	}
+	if relType == "specproperty" {
+		targetKindString := strings.Split(strings.TrimSpace(parts[2]), ":")[1]
+		targetKindStringParts := strings.Split(targetKindString, ".")
+		targetKind := targetKindStringParts[0]
+		targetKindList = append(targetKindList, targetKind)
+		rhs = targetKindStringParts[len(targetKindStringParts)-1]
+
+		lhsString := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
+		lhsStringParts := strings.Split(lhsString, ".")
+		lhs = lhsStringParts[len(lhsStringParts)-1]
+	}
+	//fmt.Printf("RelType:%s, lhs:%s, rhs:%s TargetKindList:%s\n", relType, lhs, rhs, targetKindList)
+	return relType, lhs, rhs, targetKindList
 }
 
 func getLabels(kind, instance, namespace string) map[string]string {
@@ -165,7 +363,7 @@ func searchSelectors(labelMap map[string]string, targetKind, namespace string) [
 		content := unstructuredObj.UnstructuredContent()
 		selectorMap, _, _ := unstructured.NestedStringMap(content, "spec", "selector")
 		//fmt.Printf("%s\n", unstructuredObjLabelMap)
-		match := compareMaps(labelMap, selectorMap)
+		match := subsetMatchMaps(labelMap, selectorMap)
 		if match {
 			instanceName := unstructuredObj.GetName()
 			instanceNames = append(instanceNames, instanceName)
@@ -191,8 +389,8 @@ func searchLabels(labelMap map[string]string, targetKind, namespace string) []st
 	}
 	for _, unstructuredObj := range list.Items {
 		unstructuredObjLabelMap := unstructuredObj.GetLabels()
-		//fmt.Printf("%s\n", unstructuredObjLabelMap)
-		match := compareMaps(labelMap, unstructuredObjLabelMap)
+		//fmt.Printf("Obj Label Map:%s\n", unstructuredObjLabelMap)
+		match := subsetMatchMaps(labelMap, unstructuredObjLabelMap)
 		if match {
 			instanceName := unstructuredObj.GetName()
 			instanceNames = append(instanceNames, instanceName)
@@ -201,7 +399,7 @@ func searchLabels(labelMap map[string]string, targetKind, namespace string) []st
 	return instanceNames
 }
 
-func compareMaps(map1, map2 map[string]string) bool {
+func subsetMatchMaps(map1, map2 map[string]string) bool {
 	for key, element := range map1 {
 		value, found := map2[key]
 		if !found {
@@ -211,6 +409,7 @@ func compareMaps(map1, map2 map[string]string) bool {
 			return false
 		}
 	}
+/*
 	for key, element := range map2 {
 		value, found := map1[key]
 		if !found {
@@ -220,5 +419,6 @@ func compareMaps(map1, map2 map[string]string) bool {
 			return false
 		}
 	}
+*/
 	return true
 }
