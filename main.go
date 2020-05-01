@@ -13,7 +13,7 @@ func main() {
 	if len(os.Args) == 5  || len(os.Args) == 3 {
 		var kind, instance, namespace string
 		// kubediscovery composition Moodle moodle1 default
-		// kubediscovery relation Moodle moodle1 default
+		// kubediscovery connections Moodle moodle1 default
 		// kubediscovery man Moodle
 		commandType := os.Args[1]
 		if commandType == "composition" {
@@ -26,20 +26,23 @@ func main() {
 																			  namespace)
 			fmt.Printf("%s\n", composition)
 		}
-		if commandType == "relation" {
+		if commandType == "connections" {
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
-			relatives := discovery.GetRelatives(kind, instance, namespace)
-			fmt.Printf("%s\n", relatives)
+			level := 0
+			relatives := discovery.GetRelatives(level, kind, instance, namespace)
+			for _, relative := range relatives {
+				fmt.Printf("%s\n", relative)
+			}
 		}
 		if commandType == "man" {
 			kind := os.Args[2]
 			fmt.Printf("TODO: Implement man endpoint: %s\n", kind)
 		}
-		if commandType != "composition" && commandType != "relation" && commandType != "man" {
+		if commandType != "composition" && commandType != "connections" && commandType != "man" {
 			fmt.Printf("Unknown command specified:%s\n", commandType)
-			fmt.Printf("Allowed values: [composition, relation, man]\n")
+			fmt.Printf("Allowed values: [composition, connections, man]\n")
 		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")

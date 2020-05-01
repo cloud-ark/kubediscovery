@@ -132,23 +132,27 @@ func init() {
 	kindGroupMap[RC] = ""
 	compositionMap[RC] = []string{"Pod"}
 
-	KindPluralMap[POD] = "pods"
-	kindVersionMap[POD] = "api/v1"
-	kindGroupMap[POD] = ""
-	compositionMap[POD] = []string{}
-	relationshipMap[POD] = []string{}
-
 	KindPluralMap[PDB] = "poddisruptionbudgets"
 	kindVersionMap[PDB] = "apis/policy/v1beta1"
 	kindGroupMap[PDB] = "policy"
 	compositionMap[PDB] = []string{}
+
+	KindPluralMap[POD] = "pods"
+	kindVersionMap[POD] = "api/v1"
+	kindGroupMap[POD] = ""
+	compositionMap[POD] = []string{}
+
+	podRelationships := make([]string,0)
+	podRel := "specproperty, on:INSTANCE.spec.env, value:Service.spec.metadata.name"
+	podRelationships = append(podRelationships, podRel)
+	relationshipMap[POD] = podRelationships
 
 	KindPluralMap[SERVICE] = "services"
 	kindVersionMap[SERVICE] = "api/v1"
 	kindGroupMap[SERVICE] = ""
 	compositionMap[SERVICE] = []string{}
 	serviceRelationships := make([]string,0)
-	serviceRel := "label, on:Pod;Deployment, value:instance.spec.selector"
+	serviceRel := "label, on:Pod, value:INSTANCE.spec.selector"
 	serviceRelationships = append(serviceRelationships, serviceRel)
 	relationshipMap[SERVICE] = serviceRelationships
 
