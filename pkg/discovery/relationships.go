@@ -13,27 +13,32 @@ import (
 
 func GetRelatives(level int, kind, instance, namespace string) []string{
 	relatives := make([]string, 0)
-	relStringList := relationshipMap[kind]
-	if len(relStringList) == 0 {
-		kindList := findRelatedKinds(kind)
-		for _, targetKind := range kindList {
-			relationshipStringList := relationshipMap[targetKind]
-			inverseRelatives := findInverseRelatives(kind,
-													 instance,
-													 namespace, 
-													 targetKind,
-													 relationshipStringList)
-			for _, inverseRelative := range inverseRelatives {
-				relatives = append(relatives, inverseRelative)
+	err := readKindCompositionFile(kind)
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		return relatives
+	}
+	exists := checkExistence(kind, instance, namespace)
+	if exists {
+		relStringList := relationshipMap[kind]
+		if len(relStringList) == 0 {
+			kindList := findRelatedKinds(kind)
+			for _, targetKind := range kindList {
+				relationshipStringList := relationshipMap[targetKind]
+				inverseRelatives := findInverseRelatives(kind,
+														 instance,
+														 namespace, 
+														 targetKind,
+														 relationshipStringList)
+				for _, inverseRelative := range inverseRelatives {
+					relatives = append(relatives, inverseRelative)
+				}
 			}
-		}
-	} else {
-		level = level + 1
-		//fmt.Printf("%d\n", level)
-		exists := checkExistence(kind, instance, namespace)
-		if exists {
-			relatives = findRelatives(level, kind, instance, namespace, relStringList)
-		}
+		} else {
+			level = level + 1
+			//fmt.Printf("%d\n", level)
+				relatives = findRelatives(level, kind, instance, namespace, relStringList)
+			}
 	}
 	return relatives
 }
@@ -68,7 +73,7 @@ func findInverseRelatives(kind, instance, namespace, targetKind string, relStrin
 				//selectorLabelMap := getSelectorLabels(kind, instance, namespace)
 				relativesNames := searchSelectors(labelMap, targetKind, namespace)
 				for _, relativeName := range relativesNames {
-					relativeEntry := "kind:" + targetKind + ", name:" + relativeName +  " relationship-type:label" 
+					relativeEntry := "kind:" + targetKind + " name:" + relativeName +  " relationship-type:label" 
 					relatives = append(relatives, relativeEntry)
 				}
 			}
@@ -97,6 +102,7 @@ func findRelatedKinds(kind string) []string{
 
 func findRelatives(level int, kind, instance, namespace string, relStringList []string) []string {
 	relatives := make([]string, 0)
+	//fmt.Printf("--- %v\n", relStringList)
 	for _, relString := range relStringList {
 		relType, lhs, rhs, targetKindList := parseRelationship(relString)
 		//fmt.Printf("TargetKinds:%s\n", targetKindList)
@@ -118,7 +124,15 @@ func findRelatives(level int, kind, instance, namespace string, relStringList []
 				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
 				for _, rel := range relativesSpec {
 					relatives = append(relatives, rel)
-				}			
+				}
+			}
+			if relType == "annotation" {
+				//fmt.Printf("Inside checking annotations..\n")
+				relativesNames := searchAnnotations(kind, instance, namespace, lhs, rhs, targetKind)
+				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				for _, rel := range relativesSpec {
+					relatives = append(relatives, rel)
+				}
 			}
 		}
 	}
@@ -129,7 +143,7 @@ func prepareAndSearchNextLevel(level int, relativeNames []string, targetKind, na
 	relatives := make([]string,0)
 	for _, relativeName := range relativeNames {
 		levelStr := strconv.Itoa(level)
-		relativeEntry := "Level:" + levelStr + ", kind:" + targetKind + ", name:" + relativeName +  " relationship-type:" + relType
+		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " relationship-type:" + relType
 		//fmt.Printf("%s\n", relativeEntry)
 		relatives = append(relatives, relativeEntry)
 	}
@@ -141,6 +155,47 @@ func prepareAndSearchNextLevel(level int, relativeNames []string, targetKind, na
 		relatives = append(relatives, subrelative)
 	}
 	return relatives
+}
+
+func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue, targetKind string) []string {
+	relativesNames := make([]string, 0)
+	dynamicClient, err := getDynamicClient()
+	if err != nil {
+		return relativesNames
+	}
+	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
+	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
+									   Version: lhsResApiVersion,
+									   Resource: lhsResKindPlural}
+	_, err = dynamicClient.Resource(lhsRes).Namespace(namespace).Get(context.TODO(),
+																			 	instance,
+																	   		 	metav1.GetOptions{})
+	if err != nil {
+		return relativesNames
+	}
+	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
+	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
+									   Version: rhsResApiVersion,
+									   Resource: rhsResKindPlural}
+	rhsInstList, err := dynamicClient.Resource(rhsRes).Namespace(namespace).List(context.TODO(),
+																	   metav1.ListOptions{})
+	if err != nil {
+		return relativesNames
+	}
+	for _, unstructuredObj := range rhsInstList.Items {
+		//rhsContent := unstructuredObj.UnstructuredContent()
+		//annotationMap, ok, _ := unstructured.NestedMap(rhsContent, "annotations")
+		annotations := unstructuredObj.GetAnnotations()
+		//fmt.Printf("AnnotationMap:%v\n", annotations)
+		for key, value := range annotations {
+			if key == annotationKey && value == instance {
+				rhsInstanceName := unstructuredObj.GetName()
+					//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
+				relativesNames = append(relativesNames, rhsInstanceName)
+			}
+		}
+	}
+	return relativesNames
 }
 
 func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind string) []string {
@@ -291,6 +346,12 @@ func parseRelationship(relString string) (string, string, string, []string) {
 		lhsString := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
 		lhsStringParts := strings.Split(lhsString, ".")
 		lhs = lhsStringParts[len(lhsStringParts)-1]
+	}
+	if relType == "annotation" {
+		targetKind := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
+		lhs = strings.Split(strings.TrimSpace(parts[2]), ":")[1]
+		rhs = strings.Split(strings.TrimSpace(parts[3]), ":")[1]
+		targetKindList = append(targetKindList, targetKind)
 	}
 	//fmt.Printf("RelType:%s, lhs:%s, rhs:%s TargetKindList:%s\n", relType, lhs, rhs, targetKindList)
 	return relType, lhs, rhs, targetKindList
