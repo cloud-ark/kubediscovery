@@ -12,9 +12,11 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"strconv"
 	"gopkg.in/yaml.v2"
 
 	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+    apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -50,7 +52,7 @@ func BuildCompositionTree(namespace string) {
 	var namespaces []string
 	namespaces = append(namespaces, namespace)
 
-	err := readKindCompositionFile()
+	err := readKindCompositionFile("")
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		return
@@ -85,7 +87,7 @@ func BuildCompositionTree(namespace string) {
 	TotalClusterCompositions.purgeCompositionOfDeletedItems(resourceInCluster)
 }
 
-func readKindCompositionFile() error {
+func readKindCompositionFile(inputKind string) error {
 	filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
 	if ok {
 		yamlFile, err := ioutil.ReadFile(filePath)
@@ -113,7 +115,6 @@ func readKindCompositionFile() error {
 		if err1 != nil {
 			panic(err1.Error())
 		}
-
 		crdList, err := crdClient.CustomResourceDefinitions().List(context.TODO(),
 																   metav1.ListOptions{})
 		if err != nil {
@@ -122,7 +123,6 @@ func readKindCompositionFile() error {
 		}
 		for _, crd := range crdList.Items {
 			crdName := crd.ObjectMeta.Name
-
 			crdObj, err := crdClient.CustomResourceDefinitions().Get(context.TODO(),
 													     			 crdName, 
 																	 metav1.GetOptions{})
@@ -130,26 +130,95 @@ func readKindCompositionFile() error {
 				fmt.Errorf("Error:%s\n", err)
 				return err
 			}
-			group := crdObj.Spec.Group
-			version := crdObj.Spec.Version
-			endpoint := "apis/" + group + "/" + version
-			kind := crdObj.Spec.Names.Kind
-			plural := crdObj.Spec.Names.Plural
-
-			objectMeta := crdObj.ObjectMeta
-			annotations := objectMeta.GetAnnotations()
-			compositionAnnotation := annotations["platform-as-code/composition"]
-
-			KindPluralMap[kind] = plural
-			kindVersionMap[kind] = endpoint
-			kindGroupMap[kind] = group
-
-			if compositionAnnotation != "" {
-				compositionMap[kind] = strings.Split(compositionAnnotation, ",")
+			//fmt.Printf("InputKind:%s, thisKind:%s\n", inputKind, crdObj.Spec.Names.Kind)
+			if inputKind != "" {
+				if inputKind == crdObj.Spec.Names.Kind {
+					parseCRDAnnotions(crdObj)
+					break
+				}
+			} else {
+				parseCRDAnnotions(crdObj)
 			}
 		}
 	}
 	return nil
+}
+
+func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
+
+	//fmt.Printf("Inside parseCRDAnnotions\n")
+	group := crdObj.Spec.Group
+	version := crdObj.Spec.Version
+	endpoint := "apis/" + group + "/" + version
+	kind := crdObj.Spec.Names.Kind
+	plural := crdObj.Spec.Names.Plural
+	KindPluralMap[kind] = plural
+	kindVersionMap[kind] = endpoint
+	kindGroupMap[kind] = group
+
+	objectMeta := crdObj.ObjectMeta
+	annotations := objectMeta.GetAnnotations()
+	//fmt.Printf("%v\n", annotations)
+	//fmt.Printf("&&&&\n")
+	compositionAnnotation := annotations["platform-as-code/composition"]
+	if compositionAnnotation != "" {
+		compositionMap[kind] = strings.Split(compositionAnnotation, ",")
+	}
+	annotationRels := parseRels(annotations, "platform-as-code/annotation-relationship", "annotation")
+	labelRels := parseRels(annotations, "platform-as-code/label-relationship", "label")
+	specPropertyRels := parseRels(annotations, "platform-as-code/specproperty-relationship", "specproperty")
+		//	fmt.Printf(annotationRels)
+	//fmt.Printf("A\n")
+	//printRels(annotationRels)
+	//fmt.Printf("B\n")
+	//printRels(labelRels)
+	//fmt.Printf("C\n")
+	//printRels(specPropertyRels)
+	allRels := make([]string,0)
+	allRels = mergeRels(allRels, specPropertyRels)
+	allRels = mergeRels(allRels, labelRels)
+	allRels = mergeRels(allRels, annotationRels)
+	//fmt.Printf("=====\n")
+	//printRels(allRels)
+
+	relationshipMap[kind] = allRels
+}
+
+func printRels(rels []string) {
+	for _, rel := range rels {
+		fmt.Printf("%s\n", rel)				
+	}
+	//fmt.Printf("----\n")
+}
+
+
+func mergeRels(allRels, relsToAdd []string) []string {
+	for _, item := range relsToAdd {
+		allRels = append(allRels, item)
+	}
+	return allRels
+}
+
+func parseRels(annotations map[string]string, rel, relType string) []string {
+	rels := make([]string,0)
+	count := 1
+	for key, value := range annotations {
+		extendedKey := rel+strconv.Itoa(count)
+		//fmt.Printf("ExtendedKey:%s\n", extendedKey)
+		//fmt.Printf("key:%s, rel:%s, extendedKey:%s\n", key, rel, extendedKey)
+		if key == rel || key == extendedKey {
+			//fmt.Printf("(%s, %s)\n", key, value)
+			newRelValue := relType + ", " + value
+			rels = append(rels, newRelValue)
+			if key == extendedKey {
+				count = count + 1
+			}
+			//fmt.Printf("%s,", relValue)
+		}
+	}
+	//print("^^^^\n")
+	//printRels(rels)
+	return rels
 }
 
 func getResourceKinds() []string {
