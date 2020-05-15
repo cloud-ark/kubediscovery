@@ -7,6 +7,7 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
+	"github.com/cloud-ark/kubediscovery/pkg/apiserver"
 )
 
 func main() {
@@ -38,7 +39,9 @@ func main() {
 		}
 		if commandType == "man" {
 			kind := os.Args[2]
-			fmt.Printf("TODO: Implement man endpoint: %s\n", kind)
+			//fmt.Printf("TODO: Implement man endpoint: %s\n", kind)
+			manPage := apiserver.GetManPage(kind)
+			fmt.Printf("%s\n", manPage)
 		}
 		if commandType != "composition" && commandType != "connections" && commandType != "man" {
 			fmt.Printf("Unknown command specified:%s\n", commandType)
