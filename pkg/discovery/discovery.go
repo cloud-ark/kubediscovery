@@ -164,6 +164,13 @@ func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
 	if compositionAnnotation != "" {
 		compositionMap[kind] = strings.Split(compositionAnnotation, ",")
 	}
+	//fmt.Printf("=====\n")
+	allRels := getAllRelationships(annotations)
+	//printRels(allRels)
+	relationshipMap[kind] = allRels
+}
+
+func getAllRelationships(annotations map[string]string) []string {
 	annotationRels := parseRels(annotations, "platform-as-code/annotation-relationship", "annotation")
 	labelRels := parseRels(annotations, "platform-as-code/label-relationship", "label")
 	specPropertyRels := parseRels(annotations, "platform-as-code/specproperty-relationship", "specproperty")
@@ -178,11 +185,8 @@ func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
 	allRels = mergeRels(allRels, specPropertyRels)
 	allRels = mergeRels(allRels, labelRels)
 	allRels = mergeRels(allRels, annotationRels)
-	//fmt.Printf("=====\n")
-	//printRels(allRels)
-
-	relationshipMap[kind] = allRels
-}
+	return allRels
+} 
 
 func printRels(rels []string) {
 	for _, rel := range rels {

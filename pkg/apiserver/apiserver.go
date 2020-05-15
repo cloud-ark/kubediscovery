@@ -179,35 +179,28 @@ func handleExplainEndpoint(request *restful.Request, response *restful.Response)
 
 func handleManPageEndpoint(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
-	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 
-	implementationDetails, err := discovery.GetImplementationDetails(customResourceKind)
+	manPage := GetManPage(customResourceKind)
+
+	response.Write([]byte(manPage))
+}
+
+func GetManPage(customResourceKind string) string {
+	//fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
+
+	/*implementationDetails, err := discovery.GetImplementationDetails(customResourceKind)
 
 	if err != nil {
 		implementationDetails = "Error in retrieving implementation details for Custom Resource:"
 	}
 
 	fmt.Println("Implementation choices:%v", implementationDetails)
+	*/
 
-	usageDetails, err := discovery.GetUsageDetails(customResourceKind)
+	manPage := discovery.GetUsageDetails(customResourceKind)
+	//fmt.Println("Usage guidelines:%v", manPage)
 
-	if err != nil {
-		usageDetails = "Error in retrieving usage details for Custom Resource:"
-	}
-
-	fmt.Println("Usage guidelines:%v", usageDetails)
-
-	manPage := "NAME\n"
-	manPage = manPage + "=====\n"
-	manPage = manPage + "    " + customResourceKind + "\n\n"
-	manPage = manPage + "Implementation Constants\n"
-	manPage = manPage + "=========================\n"
-	manPage = manPage + implementationDetails + "\n\n"
-	manPage = manPage + "Usage Guidelines\n"
-	manPage = manPage + "=================\n"
-	manPage = manPage + usageDetails + "\n\n"
-
-	response.Write([]byte(manPage))
+	return manPage
 }
 
 func handleImplementationDetailsEndpoint(request *restful.Request, response *restful.Response) {
@@ -229,11 +222,7 @@ func handleUsageEndpoint(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 
-	usageDetails, err := discovery.GetUsageDetails(customResourceKind)
-
-	if err != nil {
-		usageDetails = "Error in retrieving usage details for Custom Resource:"
-	}
+	usageDetails := discovery.GetUsageDetails(customResourceKind)
 
 	fmt.Println("Usage details:%v", usageDetails)
 

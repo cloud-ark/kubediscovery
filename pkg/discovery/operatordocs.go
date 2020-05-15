@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
 
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
@@ -71,7 +72,72 @@ func getCRDDetails(crdDetailsString string) (string, string, string, []string, s
 	return kind, plural, endpoint, composition, implementationChoicesCMapName, usageCMapName, openapiSpecCMapName
 }
 
-func GetUsageDetails(customResourceKind string) (string, error) {
+func GetUsageDetails(customResourceKind string) (string) {
+	var manPage, usageDetailsData, subresources, relationships string
+	crdClient, err1 := apiextensionsclientset.NewForConfig(cfg)
+	if err1 != nil {
+		fmt.Errorf("Error:%s\n", err1)
+		return manPage
+	}
+	crdList, err := crdClient.CustomResourceDefinitions().List(context.TODO(),
+		metav1.ListOptions{})
+	if err != nil {
+		fmt.Errorf("Error:%s\n", err)
+		return manPage
+	}
+	for _, crd := range crdList.Items {
+		crdName := crd.ObjectMeta.Name
+		crdObj, err := crdClient.CustomResourceDefinitions().Get(context.TODO(),
+			crdName, 
+			metav1.GetOptions{})
+		if err != nil {
+			fmt.Errorf("Error:%s\n", err)
+			return manPage
+		}
+		if customResourceKind != "" {
+			if customResourceKind == crdObj.Spec.Names.Kind {
+				objectMeta := crdObj.ObjectMeta
+				annotations := objectMeta.GetAnnotations()
+				usageDetailsCMapName := annotations["platform-as-code/usage"]
+				//fmt.Printf("usageDetailsCMapName:%s\n", usageDetailsCMapName)
+				if usageDetailsCMapName != "" {
+					usageDetailsData, err = readConfigMap(usageDetailsCMapName)
+					if err != nil {
+						fmt.Printf("Error:%s\n", err.Error())
+						usageDetailsData = "Could not find usage details data."
+					}
+				}
+				subresources = annotations["platform-as-code/composition"]
+				allRels := getAllRelationships(annotations)
+				relationships = ""
+				indentation := "    "
+				for _, rel := range allRels {
+					relationships = relationships + rel + indentation + "\n"
+				}
+			}
+		}
+	}
+
+	manPage = "NAME\n"
+	manPage = manPage + "=====\n"
+	manPage = manPage + "    " + customResourceKind + "\n\n"
+
+	manPage = manPage + "Subresources\n"
+	manPage = manPage + "=============\n"
+	manPage = manPage + subresources + "\n\n"
+
+	manPage = manPage + "Relationships\n"
+	manPage = manPage + "=============\n"
+	manPage = manPage + relationships + "\n\n"
+
+	manPage = manPage + "Usage Guidelines\n"
+	manPage = manPage + "=================\n"
+	manPage = manPage + usageDetailsData + "\n\n"
+
+	return manPage
+}
+
+func GetUsageDetails1(customResourceKind string) (string, error) {
 	var usageDetailsData string
 	var kind, usageDetailsCMapName string
 	crdNameList, err := queryETCDNodes("/crds")
@@ -201,7 +267,8 @@ func GetOpenAPISpec_prev(customResourceKind string) string {
 
 func readConfigMap(implementationDetailsString string) (string, error) {
 
-	cfg, err := rest.InClusterConfig()
+//	cfg, err := rest.InClusterConfig()
+	cfg, err = buildConfig()
 	if err != nil {
 		fmt.Printf("Error:%s\n", err.Error())
 		return "", err
@@ -226,7 +293,7 @@ func readConfigMap(implementationDetailsString string) (string, error) {
 		dataFieldName = fields[1]
 	}
 
-	fmt.Printf("Namespace:%s, configMapName:%s, dataFieldName:%s", namespace, configMapName, dataFieldName)
+	//fmt.Printf("Namespace:%s, configMapName:%s, dataFieldName:%s", namespace, configMapName, dataFieldName)
 
 	configMap, err := kubeClient.CoreV1().ConfigMaps(namespace).Get(context.TODO(),
 																	configMapName, 
@@ -240,7 +307,7 @@ func readConfigMap(implementationDetailsString string) (string, error) {
 	configMapData := configMap.Data
 	data := configMapData[dataFieldName]
 
-	fmt.Printf("Data:%s", data)
+	//fmt.Printf("Data:%s", data)
 
 	return data, nil
 }
