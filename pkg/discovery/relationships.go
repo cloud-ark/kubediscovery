@@ -21,6 +21,7 @@ func GetRelatives(level int, kind, instance, namespace string) []string{
 	exists := checkExistence(kind, instance, namespace)
 	if exists {
 		relStringList := relationshipMap[kind]
+		//fmt.Printf("RelStringList:%s\n", relStringList)
 		if len(relStringList) == 0 {
 			kindList := findRelatedKinds(kind)
 			for _, targetKind := range kindList {
@@ -46,6 +47,7 @@ func GetRelatives(level int, kind, instance, namespace string) []string{
 func checkExistence(kind, instance, namespace string) bool {
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
 		return false
 	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
@@ -56,6 +58,7 @@ func checkExistence(kind, instance, namespace string) bool {
 																			 instance,
 																	   		 metav1.GetOptions{})
 	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
 		return false
 	}
 	return true
@@ -461,8 +464,12 @@ func searchLabels(labelMap map[string]string, targetKind, namespace string) []st
 }
 
 func subsetMatchMaps(map1, map2 map[string]string) bool {
+	if len(map1) == 0 {
+		return false
+	}
 	for key, element := range map1 {
 		value, found := map2[key]
+		//fmt.Printf("Key:%s Element:%s Value:%s\n", key, element, value)
 		if !found {
 			return false
 		}
