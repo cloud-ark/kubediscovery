@@ -111,20 +111,25 @@ func findRelatives(level int, kind, instance, namespace string, relStringList []
 		//fmt.Printf("TargetKinds:%s\n", targetKindList)
 		for _, targetKind := range targetKindList {
 			//fmt.Printf("%s, %s, %s\n", relType, relValue, targetKind)
+			relDetail := ""
 			if relType == "label" {
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
 				//fmt.Printf("SelectorLabelMap:%s\n", selectorLabelMap)
 				relativesNames := searchLabels(selectorLabelMap, targetKind, namespace)
 				//fmt.Printf("Label RelativesNames:%s\n", relativesNames)
-				relativesLabel := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				for key, value := range selectorLabelMap {
+					relDetail = relDetail + key + ":" + value + " "
+				}
+				relativesLabel := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType, relDetail)
 				for _, rel := range relativesLabel {
 					relatives = append(relatives, rel)
 				}
 			}
 			if relType == "specproperty" {
-				relativesNames := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind)
+				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind)
 				//fmt.Printf("SpecProperty RelativesNames:%s\n", relativesNames)
-				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				//relDetail = lhs + " " + rhs
+				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType, relDetail)
 				for _, rel := range relativesSpec {
 					relatives = append(relatives, rel)
 				}
@@ -132,7 +137,8 @@ func findRelatives(level int, kind, instance, namespace string, relStringList []
 			if relType == "annotation" {
 				//fmt.Printf("Inside checking annotations..\n")
 				relativesNames := searchAnnotations(kind, instance, namespace, lhs, rhs, targetKind)
-				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType)
+				relDetail = lhs
+				relativesSpec := prepareAndSearchNextLevel(level, relativesNames, targetKind, namespace, relType, relDetail)
 				for _, rel := range relativesSpec {
 					relatives = append(relatives, rel)
 				}
@@ -142,11 +148,11 @@ func findRelatives(level int, kind, instance, namespace string, relStringList []
 	return relatives
 }
 
-func prepareAndSearchNextLevel(level int, relativeNames []string, targetKind, namespace, relType string) []string {
+func prepareAndSearchNextLevel(level int, relativeNames []string, targetKind, namespace, relType, relDetail string) []string {
 	relatives := make([]string,0)
 	for _, relativeName := range relativeNames {
 		levelStr := strconv.Itoa(level)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " relationship-type:" + relType
+		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail
 		//fmt.Printf("%s\n", relativeEntry)
 		relatives = append(relatives, relativeEntry)
 	}
@@ -201,29 +207,31 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 	return relativesNames
 }
 
-func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind string) []string {
+func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind string) ([]string, string) {
 	relativesNames := make([]string, 0)
+	envNameValue := ""
 	if lhs == "env" {
-		relativesNames = searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind)
+		relativesNames, envNameValue = searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind)
 	}
-	return relativesNames
+	return relativesNames, envNameValue
 }
 
-func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []string {
+func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) ([]string, string) {
 	relativesNames := make([]string, 0)
+	envNameValue := ""
 	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
 	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		return relativesNames
+		return relativesNames, envNameValue
 	}
 	instanceObj, err := dynamicClient.Resource(lhsRes).Namespace(namespace).Get(context.TODO(),
 																			 	instance,
 																	   		 	metav1.GetOptions{})
 	if err != nil {
-		return relativesNames
+		return relativesNames, envNameValue
 	}
 	lhsContent := instanceObj.UnstructuredContent()
 	//jsonContent, _ := instanceObj.MarshalJSON()
@@ -235,7 +243,7 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []
 	rhsInstList, err := dynamicClient.Resource(rhsRes).Namespace(namespace).List(context.TODO(),
 																	   metav1.ListOptions{})
 	if err != nil {
-		return relativesNames
+		return relativesNames, envNameValue
 	}
 	containerList, ok, _ := unstructured.NestedSlice(lhsContent, "spec", "containers")
 	if ok {
@@ -245,8 +253,8 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []
 			if ok {
 				for _, envVar := range envVarList {
 					envMap := envVar.(map[string]interface{})
-					//envName := envMap["name"]
-					envValue := envMap["value"]
+					envName := envMap["name"].(string)
+					envValue := envMap["value"].(string)
 					//fmt.Printf("Name:%s, Value:%s\n", envName, envValue)
 					for _, unstructuredObj := range rhsInstList.Items {
 						if rhs == "name" {
@@ -254,6 +262,7 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []
 							if envValue == rhsInstanceName {
 								//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
 								relativesNames = append(relativesNames, rhsInstanceName)
+								envNameValue = "Env Name:" + envName + " " + "Env Value:" + envValue
 							}
 						}
 					}
@@ -261,7 +270,7 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) []
 			}
 		}
 	}
-	return relativesNames
+	return relativesNames, envNameValue
 }
 
 func checkContent(lhsContent interface{}, instanceName string) bool {
