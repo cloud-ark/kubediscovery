@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strconv"
 	"path/filepath"
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/dynamic"
@@ -174,5 +175,59 @@ func printMaps() {
 	fmt.Println("Printing compositionMap")
 	for key, value := range compositionMap {
 		fmt.Printf("%s, %s\n", key, value)
+	}
+}
+
+func PrintRelatives(format string, connections []Connection) {
+	switch format {
+	case "flat": 
+		printConnectionsFlat(connections)
+	case "default":
+		printConnectionsTabs(connections)
+	}
+}
+
+func printConnectionsFlat(connections []Connection) {
+	/*for _, relative := range relatives {
+		fmt.Printf("%s\n", relative)
+	}*/
+	for _, connection := range connections {
+		levelStr := strconv.Itoa(connection.Level)
+		targetKind := connection.Kind
+		relativeName := connection.Name
+		relType := connection.RelationType
+		relDetail := connection.RelationDetails
+		ownerDetail := connection.Owner
+		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
+		fmt.Printf(relativeEntry + "\n")
+	}
+}
+
+func printConnectionsTabs(connections []Connection) {
+	for _, connection := range connections {
+		level := connection.Level
+		for t:=1; t<level; t++ {
+			fmt.Printf("\t")
+		}
+		fmt.Printf("%s/%s (related by: %s)\n", connection.Kind, connection.Name, connection.RelationType)
+		//fmt.Printf("%s/%s (%s)\n", connection.Kind, connection.Name, connection.Owner)
+	}
+}
+
+func compareConnections(c1, c2 Connection) bool {
+	if c1.Level != c2.Level {
+		return false
+	} else if c1.Kind != c2.Kind {
+		return false
+	} else if c1.Name != c2.Name {
+		return false
+	} else if c1.Namespace != c2.Namespace {
+		return false
+	} else if c1.Owner != c2.Owner {
+		return false
+	} else if c1.RelationType != c2.RelationType {
+		return false
+	} else {
+		return true
 	}
 }
