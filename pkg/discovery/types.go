@@ -56,7 +56,25 @@ type ClusterCompositions struct {
 	mux                 sync.Mutex
 }
 
+type Connection struct {
+	Level           int
+	Kind            string
+	Name            string
+	Namespace       string
+	Owner           string
+	RelationType	string // built-in vs. defined
+	RelationDetails string 
+	Peers           []Connection
+}
+
 var (
+
+	USAGE_ANNOTATION string
+	COMPOSITION_ANNOTATION string
+	ANNOTATION_REL_ANNOTATION string
+	LABEL_REL_ANNOTATION string
+	SPECPROPERTY_REL_ANNOTATION string
+
 	TotalClusterCompositions ClusterCompositions
 
 	KindPluralMap  map[string]string
@@ -185,6 +203,12 @@ func init() {
 	kindVersionMap[CONFIG_MAP] = "api/v1"
 	kindGroupMap[CONFIG_MAP] = ""
 	compositionMap[CONFIG_MAP] = []string{}
+
+	USAGE_ANNOTATION = "resource/usage"
+	COMPOSITION_ANNOTATION = "resource/composition"
+	ANNOTATION_REL_ANNOTATION = "resource/annotation-relationship"
+	LABEL_REL_ANNOTATION = "resource/label-relationship"
+	SPECPROPERTY_REL_ANNOTATION = "resource/specproperty-relationship"
 }
 
 func getKindAPIDetails(kind string) (string, string, string, string) {

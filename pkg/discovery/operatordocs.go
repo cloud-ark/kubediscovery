@@ -98,7 +98,7 @@ func GetUsageDetails(customResourceKind string) (string) {
 			if customResourceKind == crdObj.Spec.Names.Kind {
 				objectMeta := crdObj.ObjectMeta
 				annotations := objectMeta.GetAnnotations()
-				usageDetailsCMapName := annotations["platform-as-code/usage"]
+				usageDetailsCMapName := annotations[USAGE_ANNOTATION]
 				//fmt.Printf("usageDetailsCMapName:%s\n", usageDetailsCMapName)
 				if usageDetailsCMapName != "" {
 					usageDetailsData, err = readConfigMap(usageDetailsCMapName)
@@ -107,7 +107,7 @@ func GetUsageDetails(customResourceKind string) (string) {
 						usageDetailsData = "Could not find usage details data."
 					}
 				}
-				subresources = annotations["platform-as-code/composition"]
+				subresources = annotations[COMPOSITION_ANNOTATION]
 				allRels := getAllRelationships(annotations)
 				relationships = ""
 				indentation := "    "
