@@ -3,7 +3,6 @@ package discovery
 import (
 	"strings"
 	"fmt"
-	"strconv"
 	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -11,25 +10,18 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 )
 
-func GetRelatives(relatives []string, connections [] Connection, level int, kind, instance, namespace string) ([]string, []Connection) {
+func GetRelatives(connections [] Connection, level int, kind, instance, namespace string) ([]Connection) {
 	err := readKindCompositionFile(kind)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
-		return relatives, connections
+		return connections
 	}
 	exists := checkExistence(kind, instance, namespace)
 	if exists {
-		relMap := make(map[string][]string)
-		relStringList := relationshipMap[kind]
-		relMap[kind] = relStringList
 		relatedKindList := findRelatedKinds(kind)
-		for _, k := range relatedKindList {
-			relationshipStringList := relationshipMap[k]
-			relMap[k] = relationshipStringList
-		}
-		relatives, connections = findRelatives(relatives, connections, level, kind, instance, namespace, relatedKindList)
+		connections = findRelatives(connections, level, kind, instance, namespace, relatedKindList)
 	}
-	return relatives, connections
+	return connections
 }
 
 func checkExistence(kind, instance, namespace string) bool {
@@ -67,25 +59,24 @@ func findRelatedKinds(kind string) []string{
 	return relatedKinds
 }
 
-func findRelatives(relatives []string, connections []Connection, level int, kind, instance, namespace string, relatedKindList []string) ([]string, []Connection) {
+func findRelatives(connections []Connection, level int, kind, instance, namespace string, relatedKindList []string) ([]Connection) {
 	// Put self in the list of relations so that we don't traverse back to self.
 	relativesNames := make([]string,0)
 	relativesNames = append(relativesNames, instance)
-	unseenRelatives := filterRelatives(relatives, relativesNames)
-	currentPeers, currentConnections := prepare(level, unseenRelatives, kind, namespace, "", "")
-	relatives, connections = appendCurrentLevelPeers(relatives, currentPeers, connections, currentConnections, level)
+	unseenRelatives := filterRelatives(connections, relativesNames)
+	currentConnections := prepare(level, unseenRelatives, kind, namespace, "", "")
+	connections = appendCurrentLevelPeers(connections, currentConnections, level)
 	level = level + 1
-
 	relStringList := relationshipMap[kind]
-	relatives, connections = findDownstreamRelatives(relatives, connections, level, kind, instance, namespace, relStringList)
+	connections = findDownstreamRelatives(connections, level, kind, instance, namespace, relStringList)
 	for _, relatedKind := range relatedKindList {
 		relStringList = relationshipMap[relatedKind]
-		relatives, connections = findUpstreamRelatives(relatives, connections, level, relatedKind, instance, namespace, relStringList)
+		connections = findUpstreamRelatives(connections, level, relatedKind, instance, namespace, relStringList)
 	}
-	return relatives, connections
+	return connections
 }
 
-func findDownstreamRelatives(relatives []string, connections []Connection, level int, kind, instance, namespace string, relStringList []string) ([]string, []Connection) {
+func findDownstreamRelatives(connections []Connection, level int, kind, instance, namespace string, relStringList []string) ([]Connection) {
 	for _, relString := range relStringList {
 		relType, lhs, rhs, targetKindList := parseRelationship(relString)
 		for _, targetKind := range targetKindList {
@@ -93,25 +84,25 @@ func findDownstreamRelatives(relatives []string, connections []Connection, level
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
 				relativesNames, relDetail := searchLabels(selectorLabelMap, targetKind, namespace)
 				//fmt.Printf("FDSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
-				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
+				connections = buildGraph(connections, level, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 			if relType == "specproperty" {
 				targetInstance := "*"
 				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
 				//fmt.Printf("FDSR Spec - Relnames:%v Relatives:%v\n", relativesNames, relatives)
-				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
+				connections = buildGraph(connections, level, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 			if relType == "annotation" {
 				relativesNames, relDetail := searchAnnotations(kind, instance, namespace, lhs, rhs, targetKind)
 				//fmt.Printf("FDSR Annotation:%v\n", relativesNames)				
-				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
+				connections = buildGraph(connections, level, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 		}
 	}
-	return relatives, connections
+	return connections
 }
 
-func findUpstreamRelatives(relatives []string, connections []Connection, level int, kind, targetInstance, namespace string, relStringList []string) ([]string, []Connection) {
+func findUpstreamRelatives(connections []Connection, level int, kind, targetInstance, namespace string, relStringList []string) ([]Connection) {
 	for _, relString := range relStringList {
 		relType, lhs, rhs, targetKindList := parseRelationship(relString)
 		for _, targetKind := range targetKindList {
@@ -119,38 +110,36 @@ func findUpstreamRelatives(relatives []string, connections []Connection, level i
 				labelMap := getLabels(targetKind, targetInstance, namespace)
 				relativesNames, relDetail := searchSelectors(labelMap, kind, namespace)
 				//fmt.Printf("FUSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
-				relatives, connections = buildGraph(relatives, connections, level, relativesNames, kind, namespace, relType, relDetail)
+				connections = buildGraph(connections, level, relativesNames, kind, namespace, relType, relDetail)
 			}
 			if relType == "specproperty" {
 				instance := "*"
 				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
 				//fmt.Printf("FUSR Spec - Relnames:%v Relatives:%v\n", relativesNames, relatives)
-				relatives, connections = buildGraph(relatives, connections, level, relativesNames, kind, namespace, relType, relDetail)
+				connections = buildGraph(connections, level, relativesNames, kind, namespace, relType, relDetail)
 			}
 			if relType == "annotation" {
 			}
 		}
 	}
-	return relatives, connections
+	return connections
 }
 
-func buildGraph(relatives []string, connections []Connection, level int, relativesNames []string, targetKind, namespace, relType, relDetail string) ([]string, []Connection) {
-	currentPeers, currentConnections := prepare(level, relativesNames, targetKind, namespace, relType, relDetail)
-	unseenRelatives := filterRelatives(relatives, relativesNames)
-	relatives, connections = appendCurrentLevelPeers(relatives, currentPeers, connections, currentConnections, level)	
-	nextLevelPeers, nextLevelConnections := searchNextLevel(relatives, connections, level, unseenRelatives, targetKind, namespace, relType, relDetail)
-	relatives, connections = appendNextLevelPeers(relatives, nextLevelPeers, connections, nextLevelConnections)
-	return relatives, connections
+func buildGraph(connections []Connection, level int, relativesNames []string, targetKind, namespace, relType, relDetail string) ([]Connection) {
+	currentConnections := prepare(level, relativesNames, targetKind, namespace, relType, relDetail)
+	unseenRelatives := filterRelatives(connections, relativesNames)
+	connections = appendCurrentLevelPeers(connections, currentConnections, level)	
+	nextLevelConnections := searchNextLevel(connections, level, unseenRelatives, targetKind, namespace, relType, relDetail)
+	connections = appendNextLevelPeers(connections, nextLevelConnections)
+	return connections
 }
 
-func filterRelatives(relatives, relativeNames []string) []string {
+func filterRelatives(connections []Connection, relativeNames []string) []string {
 	relativesToSearch := make([]string,0)
 	for _, relativeName := range relativeNames {
 		found := false
-		for _, currentRelative := range relatives {
-			parts := strings.Split(currentRelative, " ")
-			partsTwoName := strings.Split(parts[2], ":")[1]
-			if partsTwoName == relativeName {
+		for _, currentRelative := range connections {
+			if currentRelative.Name == relativeName {
 				found = true
 			}
 		}
@@ -161,24 +150,12 @@ func filterRelatives(relatives, relativeNames []string) []string {
 	return relativesToSearch
 }
 
-func appendCurrentLevelPeers(relatives, currentPeers []string, connections, currentConnections []Connection, level int) ([]string, []Connection) {
-	relatives = appendRelatives(relatives, currentPeers)
+func appendCurrentLevelPeers(connections, currentConnections []Connection, level int) ([]Connection) {
 	connections = appendConnections(connections, currentConnections, level)
-	return relatives, connections
+	return connections
 }
 
-func appendNextLevelPeers(relatives, nextLevelPeers []string, connections, nextLevelConnections []Connection) ([]string, []Connection) {
-	for _, nrel := range nextLevelPeers {
-		present := false
-		for _, rel := range relatives {
-			if nrel == rel {
-				present = true
-			}
-		}
-		if !present {
-			relatives = append(relatives, nrel)
-		}
-	}
+func appendNextLevelPeers(connections, nextLevelConnections []Connection) ([]Connection) {
 	for _, nconnect := range nextLevelConnections {
 		present := false
 		for _, connect := range connections {
@@ -190,17 +167,13 @@ func appendNextLevelPeers(relatives, nextLevelPeers []string, connections, nextL
 			connections = append(connections, nconnect)
 		}
 	}
-	return relatives, connections
+	return connections
 }
 
-func prepare(level int, relativeNames []string, targetKind, namespace, relType, relDetail string) ([]string, []Connection) {
-	preparedRels := make([]string,0)
+func prepare(level int, relativeNames []string, targetKind, namespace, relType, relDetail string) ([]Connection) {
 	preparedConnections := make([]Connection,0)
 	for _, relativeName := range relativeNames {
-		levelStr := strconv.Itoa(level)
 		ownerDetail := getOwnerDetail(targetKind, relativeName, namespace)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
-		preparedRels = append(preparedRels, relativeEntry)
 		connection := Connection{
 			Level: level,
 			Kind: targetKind,
@@ -212,26 +185,19 @@ func prepare(level int, relativeNames []string, targetKind, namespace, relType, 
 		}
 		preparedConnections = append(preparedConnections, connection)
 	}
-	return preparedRels, preparedConnections
+	return preparedConnections
 }
 
-func searchNextLevel(relatives []string, connections []Connection, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) ([]string, []Connection) {
-	var subrelatives []string
+func searchNextLevel(connections []Connection, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) ([]Connection) {
 	for _, relativeName := range relativeNames {
-		subrelatives, connections = GetRelatives(relatives, connections, level, targetKind, relativeName, namespace)
+		connections = GetRelatives(connections, level, targetKind, relativeName, namespace)
 	}
-	return subrelatives, connections
+	return connections
 }
 
 func getOwnerDetail(kind, instance, namespace string) string {
-	oKind := ""
-	oInstance := ""
 	ownerKind, ownerInstance := findOwner(kind, instance, namespace)
-	if ownerKind != kind && ownerInstance != instance {
-		oKind = ownerKind
-		oInstance = ownerInstance
-	}
-	ownerDetail := "Owner:" + oKind + "/" + oInstance
+	ownerDetail := "Owner:" + ownerKind + "/" + ownerInstance
 	return ownerDetail
 }
 
@@ -254,18 +220,18 @@ func findOwner(kind, instance, namespace string) (string, string) {
 	}
 	ownerReference := instanceObj.GetOwnerReferences()
 	if len(ownerReference) == 0 {
-		ownerKind = kind
-		ownerInstance = instance
+		return ownerKind, ownerInstance
 	} else {
 		owner := ownerReference[0]
 		oKind := owner.Kind
 		oName := owner.Name
 		ownerKind, ownerInstance = findOwner(oKind, oName, namespace)
-		if ownerKind == kind {
-			ownerKind = ""
+		// Reached the root
+		if ownerKind == "" {
+			ownerKind = oKind
 		}
-		if ownerInstance == instance {
-			ownerInstance = ""
+		if ownerInstance == "" {
+			ownerInstance = oName
 		}
 	}
 	return ownerKind, ownerInstance
@@ -384,18 +350,15 @@ func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, ta
 func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetInstance string) ([]string, string) {
 	relativesNames := make([]string, 0)
 	envNameValue := ""
-
 	//fmt.Printf("((kind:%s, instance:%s, targetKind:%s, targetInstance:%s))\n", kind, instance, targetKind, targetInstance)
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return relativesNames, envNameValue
 	}
-
 	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
 	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
-	//var lhsInstList *unstructured.UnstructuredList
 	lhsInstList := make([]*unstructured.Unstructured,0)
 	if instance == "*" {
 		lhsInstances, err := dynamicClient.Resource(lhsRes).Namespace(namespace).List(context.TODO(),
