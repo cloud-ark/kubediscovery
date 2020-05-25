@@ -12,7 +12,6 @@ import (
 )
 
 func GetRelatives(relatives []string, connections [] Connection, level int, kind, instance, namespace string) ([]string, []Connection) {
-	//relatives := make([]string, 0)
 	err := readKindCompositionFile(kind)
 	if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
@@ -20,27 +19,15 @@ func GetRelatives(relatives []string, connections [] Connection, level int, kind
 	}
 	exists := checkExistence(kind, instance, namespace)
 	if exists {
+		relMap := make(map[string][]string)
 		relStringList := relationshipMap[kind]
-		//fmt.Printf("RelStringList:%s\n", relStringList)
-		if len(relStringList) == 0 {
-			kindList := findRelatedKinds(kind)
-			for _, targetKind := range kindList {
-				relationshipStringList := relationshipMap[targetKind]
-				inverseRelatives := findInverseRelatives(kind,
-														 instance,
-														 namespace, 
-														 targetKind,
-														 relationshipStringList)
-				for _, inverseRelative := range inverseRelatives {
-					relatives = append(relatives, inverseRelative)
-				}
-			}
-		} else {
-			level = level + 1
-			//fmt.Printf("%d\n", level)
-			//relatives := make([]string, 0)
-			relatives, connections = findRelatives(relatives, connections, level, kind, instance, namespace, relStringList)
+		relMap[kind] = relStringList
+		relatedKindList := findRelatedKinds(kind)
+		for _, k := range relatedKindList {
+			relationshipStringList := relationshipMap[k]
+			relMap[k] = relationshipStringList
 		}
+		relatives, connections = findRelatives(relatives, connections, level, kind, instance, namespace, relatedKindList)
 	}
 	return relatives, connections
 }
@@ -65,30 +52,6 @@ func checkExistence(kind, instance, namespace string) bool {
 	return true
 }
 
-func findInverseRelatives(kind, instance, namespace, targetKind string, relStringList []string) []string {
-	relatives := make([]string, 0)
-	for _, relString := range relStringList {
-		relType, _, _, _ := parseRelationship(relString)
-		//fmt.Printf("TargetKinds:%s\n", targetKindList)
-		//for _, targetKind := range targetKindList {
-			//fmt.Printf("%s, %s, %s\n", relType, relValue, targetKind)
-			if relType == "label" {
-				labelMap := getLabels(kind, instance, namespace)
-				//selectorLabelMap := getSelectorLabels(kind, instance, namespace)
-				relativesNames := searchSelectors(labelMap, targetKind, namespace)
-				for _, relativeName := range relativesNames {
-					relativeEntry := "kind:" + targetKind + " name:" + relativeName +  " relationship-type:label" 
-					relatives = append(relatives, relativeEntry)
-				}
-			}
-			if relType == "specProperty" {
-
-			}
-		//}
-	}
-	return relatives
-}
-
 func findRelatedKinds(kind string) []string{
 	relatedKinds := make([]string, 0)
 	for key, relStringList := range relationshipMap {
@@ -104,22 +67,67 @@ func findRelatedKinds(kind string) []string{
 	return relatedKinds
 }
 
-func findRelatives(relatives []string, connections []Connection, level int, kind, instance, namespace string, relStringList []string) ([]string, []Connection) {
+func findRelatives(relatives []string, connections []Connection, level int, kind, instance, namespace string, relatedKindList []string) ([]string, []Connection) {
+	// Put self in the list of relations so that we don't traverse back to self.
+	relativesNames := make([]string,0)
+	relativesNames = append(relativesNames, instance)
+	unseenRelatives := filterRelatives(relatives, relativesNames)
+	currentPeers, currentConnections := prepare(level, unseenRelatives, kind, namespace, "", "")
+	relatives, connections = appendCurrentLevelPeers(relatives, currentPeers, connections, currentConnections, level)
+	level = level + 1
+
+	relStringList := relationshipMap[kind]
+	relatives, connections = findDownstreamRelatives(relatives, connections, level, kind, instance, namespace, relStringList)
+	for _, relatedKind := range relatedKindList {
+		relStringList = relationshipMap[relatedKind]
+		relatives, connections = findUpstreamRelatives(relatives, connections, level, relatedKind, instance, namespace, relStringList)
+	}
+	return relatives, connections
+}
+
+func findDownstreamRelatives(relatives []string, connections []Connection, level int, kind, instance, namespace string, relStringList []string) ([]string, []Connection) {
 	for _, relString := range relStringList {
 		relType, lhs, rhs, targetKindList := parseRelationship(relString)
 		for _, targetKind := range targetKindList {
 			if relType == "label" {
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
 				relativesNames, relDetail := searchLabels(selectorLabelMap, targetKind, namespace)
+				//fmt.Printf("FDSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 			if relType == "specproperty" {
-				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind)
+				targetInstance := "*"
+				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
+				//fmt.Printf("FDSR Spec - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 			if relType == "annotation" {
 				relativesNames, relDetail := searchAnnotations(kind, instance, namespace, lhs, rhs, targetKind)
+				//fmt.Printf("FDSR Annotation:%v\n", relativesNames)				
 				relatives, connections = buildGraph(relatives, connections, level, relativesNames, targetKind, namespace, relType, relDetail)
+			}
+		}
+	}
+	return relatives, connections
+}
+
+func findUpstreamRelatives(relatives []string, connections []Connection, level int, kind, targetInstance, namespace string, relStringList []string) ([]string, []Connection) {
+	for _, relString := range relStringList {
+		relType, lhs, rhs, targetKindList := parseRelationship(relString)
+		for _, targetKind := range targetKindList {
+			if relType == "label" {
+				labelMap := getLabels(targetKind, targetInstance, namespace)
+				relativesNames, relDetail := searchSelectors(labelMap, kind, namespace)
+				//fmt.Printf("FUSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
+				relatives, connections = buildGraph(relatives, connections, level, relativesNames, kind, namespace, relType, relDetail)
+			}
+			if relType == "specproperty" {
+				instance := "*"
+				relativesNames, relDetail := searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
+				//fmt.Printf("FUSR Spec - Relnames:%v Relatives:%v\n", relativesNames, relatives)
+				relatives, connections = buildGraph(relatives, connections, level, relativesNames, kind, namespace, relType, relDetail)
+			}
+			if relType == "annotation" {
 			}
 		}
 	}
@@ -129,7 +137,7 @@ func findRelatives(relatives []string, connections []Connection, level int, kind
 func buildGraph(relatives []string, connections []Connection, level int, relativesNames []string, targetKind, namespace, relType, relDetail string) ([]string, []Connection) {
 	currentPeers, currentConnections := prepare(level, relativesNames, targetKind, namespace, relType, relDetail)
 	unseenRelatives := filterRelatives(relatives, relativesNames)
-	relatives, connections = appendCurrentLevelPeers(relatives, currentPeers, connections, currentConnections)
+	relatives, connections = appendCurrentLevelPeers(relatives, currentPeers, connections, currentConnections, level)	
 	nextLevelPeers, nextLevelConnections := searchNextLevel(relatives, connections, level, unseenRelatives, targetKind, namespace, relType, relDetail)
 	relatives, connections = appendNextLevelPeers(relatives, nextLevelPeers, connections, nextLevelConnections)
 	return relatives, connections
@@ -153,13 +161,9 @@ func filterRelatives(relatives, relativeNames []string) []string {
 	return relativesToSearch
 }
 
-func appendCurrentLevelPeers(relatives, currentPeers []string, connections, currentConnections []Connection) ([]string, []Connection) {
-	for _, rel := range currentPeers {
-		relatives = append(relatives, rel)
-	}
-	for _, connection := range currentConnections {
-		connections = append(connections, connection)
-	}
+func appendCurrentLevelPeers(relatives, currentPeers []string, connections, currentConnections []Connection, level int) ([]string, []Connection) {
+	relatives = appendRelatives(relatives, currentPeers)
+	connections = appendConnections(connections, currentConnections, level)
 	return relatives, connections
 }
 
@@ -219,85 +223,6 @@ func searchNextLevel(relatives []string, connections []Connection, level int, re
 	return subrelatives, connections
 }
 
-func prepare_prev(relatives []string, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) []string {
-	fmt.Printf("((%v))\n", relatives)
-	fmt.Printf("&&%v&&\n", relativeNames)
-	relativesToSearch := make([]string,0)
-	for _, relativeName := range relativeNames {
-		found := false
-		for _, currentRelative := range relatives {
-			parts := strings.Split(currentRelative, " ")
-			partsTwoName := strings.Split(parts[2], ":")[1]
-			if partsTwoName == relativeName {
-				found = true
-			}
-		}
-		if !found {
-			relativesToSearch = append(relativesToSearch, relativeName)
-		}
-	}
-	for _, relativeName := range relativesToSearch {
-		levelStr := strconv.Itoa(level)
-		ownerDetail := getOwnerDetail(targetKind, relativeName, namespace)
-		//fmt.Printf("Owner Detail:%s\n", ownerDetail)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
-		//fmt.Printf("%s\n", relativeEntry)
-		present := false
-		for _, r := range relatives {
-			if r == relativeEntry {
-				present = true
-			}
-		}
-		if !present {
-			relatives = append(relatives, relativeEntry)
-		}
-	}
-	return relatives
-}
-
-func prepareAndSearchNextLevel(relatives []string, connections []Connection, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) []string {
-	//fmt.Printf("((%v))\n", relatives)
-	//fmt.Printf("&&%v&&\n", relativeNames)
-	relativesToSearch := make([]string,0)
-	for _, relativeName := range relativeNames {
-		found := false
-		for _, currentRelative := range relatives {
-			parts := strings.Split(currentRelative, " ")
-			partsTwoName := strings.Split(parts[2], ":")[1]
-			if partsTwoName == relativeName {
-				found = true
-			}
-		}
-		if !found {
-			relativesToSearch = append(relativesToSearch, relativeName)
-		}
-	}
-	for _, relativeName := range relativesToSearch {
-		levelStr := strconv.Itoa(level)
-		ownerDetail := getOwnerDetail(targetKind, relativeName, namespace)
-		//fmt.Printf("Owner Detail:%s\n", ownerDetail)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
-		//fmt.Printf("%s\n", relativeEntry)
-		present := false
-		for _, r := range relatives {
-			if r == relativeEntry {
-				present = true
-			}
-		}
-		if !present {
-			relatives = append(relatives, relativeEntry)
-		}
-	}
-	var subrelatives []string
-	for _, relativeName := range relativesToSearch {
-		subrelatives, connections = GetRelatives(relatives, connections, level, targetKind, relativeName, namespace)
-	}
-	for _, subrelative := range subrelatives {
-		relatives = append(relatives, subrelative)
-	}
-	return relatives
-}
-
 func getOwnerDetail(kind, instance, namespace string) string {
 	oKind := ""
 	oInstance := ""
@@ -335,7 +260,6 @@ func findOwner(kind, instance, namespace string) (string, string) {
 		owner := ownerReference[0]
 		oKind := owner.Kind
 		oName := owner.Name
-		//fmt.Printf("oKind:%s, oName:%s\n", oKind, oName)
 		ownerKind, ownerInstance = findOwner(oKind, oName, namespace)
 		if ownerKind == kind {
 			ownerKind = ""
@@ -390,18 +314,18 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 	return relativesNames, relDetail
 }
 
-func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind string) ([]string, string) {
+func searchSpecProperty(kind, instance, namespace, lhs, rhs, targetKind, targetInstance string) ([]string, string) {
 	relativesNames := make([]string, 0)
 	envNameValue := ""
 	if lhs == "env" {
-		relativesNames, envNameValue = searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind)
+		relativesNames, envNameValue = searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetInstance)
 	} else {
-		relativesNames, envNameValue = searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind)		
+		relativesNames, envNameValue = searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, targetInstance)		
 	}
 	return relativesNames, envNameValue
 }
 
-func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind string) ([]string, string) {
+func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, targetInstance string) ([]string, string) {
 	relativesNames := make([]string, 0)
 	propertyNameValue := ""
 	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
@@ -457,72 +381,107 @@ func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind str
 	return relativesNames, propertyNameValue
 }
 
-func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) ([]string, string) {
+func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetInstance string) ([]string, string) {
 	relativesNames := make([]string, 0)
 	envNameValue := ""
-	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
-	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
-									   Version: lhsResApiVersion,
-									   Resource: lhsResKindPlural}
+
+	//fmt.Printf("((kind:%s, instance:%s, targetKind:%s, targetInstance:%s))\n", kind, instance, targetKind, targetInstance)
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return relativesNames, envNameValue
 	}
-	instanceObj, err := dynamicClient.Resource(lhsRes).Namespace(namespace).Get(context.TODO(),
-																			 	instance,
-																	   		 	metav1.GetOptions{})
-	if err != nil {
-		return relativesNames, envNameValue
+
+	lhsResKindPlural, _, lhsResApiVersion, lhsResGroup := getKindAPIDetails(kind)
+	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
+									   Version: lhsResApiVersion,
+									   Resource: lhsResKindPlural}
+	//var lhsInstList *unstructured.UnstructuredList
+	lhsInstList := make([]*unstructured.Unstructured,0)
+	if instance == "*" {
+		lhsInstances, err := dynamicClient.Resource(lhsRes).Namespace(namespace).List(context.TODO(),
+																		   		 	metav1.ListOptions{})
+		if err != nil {
+			return relativesNames, envNameValue
+		}
+		for _, lhsObj := range lhsInstances.Items {
+			//lhsName := lhsObj.GetName()
+			//fmt.Printf("&&&%s\n", lhsName)
+			lhsObjCopy := lhsObj.DeepCopy()
+			lhsInstList = append(lhsInstList, lhsObjCopy)
+		}
+	} else {
+		lhsObj, err := dynamicClient.Resource(lhsRes).Namespace(namespace).Get(context.TODO(), instance,
+																		   	   metav1.GetOptions{})
+		if err != nil {
+			return relativesNames, envNameValue
+		}
+		lhsInstList = append(lhsInstList, lhsObj)
 	}
-	lhsContent := instanceObj.UnstructuredContent()
-	//jsonContent, _ := instanceObj.MarshalJSON()
-	//fmt.Printf("JSON Content:%s\n", string(jsonContent))
 
 	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
-	rhsInstList, err := dynamicClient.Resource(rhsRes).Namespace(namespace).List(context.TODO(),
-																	   metav1.ListOptions{})
-	if err != nil {
-		return relativesNames, envNameValue
+	rhsInstList := make([]*unstructured.Unstructured,0)
+	if targetInstance == "*" {
+		rhsInstances, err := dynamicClient.Resource(rhsRes).Namespace(namespace).List(context.TODO(),
+																				   metav1.ListOptions{})
+		if err != nil {
+			return relativesNames, envNameValue
+		}
+		for _, rhsObj := range rhsInstances.Items {
+			rhsObjCopy := rhsObj.DeepCopy()
+			rhsInstList = append(rhsInstList, rhsObjCopy)
+		}
+	} else {
+		rhsObj, err := dynamicClient.Resource(rhsRes).Namespace(namespace).Get(context.TODO(), targetInstance,
+																		   	   metav1.GetOptions{})
+		if err != nil {
+			return relativesNames, envNameValue
+		}
+		rhsInstList = append(rhsInstList, rhsObj)
 	}
-	containerList, ok, _ := unstructured.NestedSlice(lhsContent, "spec", "containers")
-	if ok {
-		for _, cont := range containerList {
-			container := cont.(map[string]interface{})
-			envVarList, ok, _ := unstructured.NestedSlice(container,"env")
-			if ok {
-				for _, envVar := range envVarList {
-					envMap := envVar.(map[string]interface{})
-					envName := ""
-					envValue := ""
-					if val, ok := envMap["name"]; ok {
-						envName = val.(string)
-					}
-					//envName := envMap["name"].(string)
-					if val, ok := envMap["value"]; ok {
-						envValue = val.(string)
-					}
-					//envValue := envMap["value"].(string)
-					//fmt.Printf("Name:%s, Value:%s", envName, envValue)
-					for _, unstructuredObj := range rhsInstList.Items {
-						//fmt.Printf(" Service name:%s\n", unstructuredObj.GetName())
-						if rhs == "name" {
-							rhsInstanceName := unstructuredObj.GetName()
-							if envValue == rhsInstanceName {
-								//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
-								present := false
-								for _, relName := range relativesNames {
-									if relName == rhsInstanceName {
-										present = true
-										break
+
+	//fmt.Printf("LHSList:%v\n", lhsInstList)
+	//fmt.Printf("RHSList:%v\n", rhsInstList)	
+	for _, instanceObj := range lhsInstList {
+		lhsContent := instanceObj.UnstructuredContent()
+		lhsName := instanceObj.GetName()
+		//jsonContent, _ := instanceObj.MarshalJSON()
+		//fmt.Printf("JSON Content:%s\n", string(jsonContent))
+		containerList, ok, _ := unstructured.NestedSlice(lhsContent, "spec", "containers")
+		if ok {
+			for _, cont := range containerList {
+				container := cont.(map[string]interface{})
+				envVarList, ok, _ := unstructured.NestedSlice(container,"env")
+				if ok {
+					for _, envVar := range envVarList {
+						envMap := envVar.(map[string]interface{})
+						envName := ""
+						envValue := ""
+						if val, ok := envMap["name"]; ok {
+							envName = val.(string)
+						}
+						//envName := envMap["name"].(string)
+						if val, ok := envMap["value"]; ok {
+							envValue = val.(string)
+						}
+						//envValue := envMap["value"].(string)
+						//fmt.Printf("Name:%s, Value:%s", envName, envValue)
+						for _, unstructuredObj := range rhsInstList {
+							//fmt.Printf(" Service name:%s\n", unstructuredObj.GetName())
+							if rhs == "name" {
+								rhsInstanceName := unstructuredObj.GetName()
+								if envValue == rhsInstanceName {
+									if instance == "*" {
+										//fmt.Printf("LHS InstanceName:%s\n", lhsName)
+										relativesNames = appendRelNames(relativesNames, lhsName)
+									} else {
+										//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
+										relativesNames = appendRelNames(relativesNames, rhsInstanceName)
+										envNameValue = "Name:" + envName + " " + "Value:" + envValue
 									}
 								}
-								if !present {
-									relativesNames = append(relativesNames, rhsInstanceName)
-								}
-								envNameValue = "Name:" + envName + " " + "Value:" + envValue
 							}
 						}
 					}
@@ -530,45 +489,11 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind string) ([
 			}
 		}
 	}
+	//fmt.Printf("Spec Prop:%v\n", relativesNames)
 	return relativesNames, envNameValue
 }
 
-func checkContent(lhsContent interface{}, instanceName string) bool {
-	//var content interface{}
-	_, ok1 := lhsContent.(map[string]interface{})
-	if ok1 {
-		content := lhsContent.(map[string]interface{})
-		for _, value := range content {
-			//fmt.Printf("Key: Value:%s\n", key, value)
-			stringVal, ok := value.(string)
-			if ok {
-				if stringVal == instanceName {
-					fmt.Printf("*** FOUND *** value:%s\n", stringVal)
-					return true
-				}
-			} else {
-				return checkContent(value, instanceName)
-			}
-		}
-	}
-	_, ok2 := lhsContent.([]string)
-	if ok2 {
-		content := lhsContent.([]string)
-		for _, value := range content {
-				if strings.Contains(value, instanceName) {
-					parts := strings.Split(value, ":")
-					for _, part := range parts {
-						fmt.Printf("--- FOUND --- value:%s part:%s\n", value, part)
-						return true
-					}
-				}
-		}
-	}
-	return false
-}
-
 func parseRelationship(relString string) (string, string, string, []string) {
-	// Update this method to parse out the kinds based on relationship types: label vs. specproperty
 	targetKindList := make([]string, 0)
 	parts := strings.Split(relString, ",")
 	relType := strings.TrimSpace(parts[0])
@@ -648,11 +573,12 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 	return selectorMap
 }
 
-func searchSelectors(labelMap map[string]string, targetKind, namespace string) []string {
+func searchSelectors(labelMap map[string]string, targetKind, namespace string) ([]string, string) {
 	instanceNames := make([]string, 0)
+	relDetail := ""
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		return instanceNames
+		return instanceNames, relDetail
 	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(targetKind)
 	res := schema.GroupVersionResource{Group: resourceGroup,
@@ -661,18 +587,23 @@ func searchSelectors(labelMap map[string]string, targetKind, namespace string) [
 	list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
 																	   metav1.ListOptions{})
 	if err != nil {
-		return instanceNames
+		return instanceNames, relDetail
 	}
 	for _, unstructuredObj := range list.Items {
 		content := unstructuredObj.UnstructuredContent()
 		selectorMap, _, _ := unstructured.NestedStringMap(content, "spec", "selector")
-		match := subsetMatchMaps(labelMap, selectorMap)
+		//fmt.Printf("searchSelectors %s %v\n", unstructuredObj.GetName(), selectorMap)
+		//fmt.Printf("searchSelectors %v\n", labelMap)
+		match := subsetMatchMaps(selectorMap, labelMap)
 		if match {
 			instanceName := unstructuredObj.GetName()
 			instanceNames = append(instanceNames, instanceName)
+			for key, value := range selectorMap {
+				relDetail = relDetail + key + ":" + value + " "
+			}
 		}
 	}
-	return instanceNames
+	return instanceNames, relDetail
 }
 
 func searchLabels(labelMap map[string]string, targetKind, namespace string) ([]string, string) {
