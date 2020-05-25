@@ -36,9 +36,8 @@ func main() {
 				format = os.Args[6]
 			}
 			level := 0
-			relatives := make([]string, 0)
 			connections := make([]discovery.Connection, 0)
-			relatives, connections = discovery.GetRelatives(relatives, connections, level, kind, instance, namespace)
+			connections = discovery.GetRelatives(connections, level, kind, instance, namespace)
 			discovery.PrintRelatives(format, connections)
 		}
 		if commandType == "man" {

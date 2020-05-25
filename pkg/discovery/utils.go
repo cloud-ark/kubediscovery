@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strconv"
-	"strings"
 	"path/filepath"
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/dynamic"
@@ -18,6 +17,7 @@ import (
 var (
 	cfg *rest.Config
 	err error
+	dynamicClient dynamic.Interface
 )
 
 func init() {
@@ -51,7 +51,9 @@ func homeDir() string {
 }
 
 func getDynamicClient() (dynamic.Interface, error) {
-	dynamicClient, err := dynamic.NewForConfig(cfg)
+	if dynamicClient == nil {
+		dynamicClient, err = dynamic.NewForConfig(cfg)
+	}
 	return dynamicClient, err
 }
 
@@ -183,21 +185,22 @@ func PrintRelatives(format string, connections []Connection) {
 	switch format {
 	case "flat": 
 		printConnectionsFlat(connections)
-	case "default":
+	case "tabbed":
 		printConnectionsTabs(connections)
+	case "default":
+		printConnections(connections)
 	}
+}
+
+func printConnections(connections []Connection) {
+	fmt.Printf("%v", connections)
 }
 
 func printConnectionsFlat(connections []Connection) {
 	for _, connection := range connections {
 		levelStr := strconv.Itoa(connection.Level)
-		targetKind := connection.Kind
-		relativeName := connection.Name
-		//relType := connection.RelationType
-		//relDetail := connection.RelationDetails
-		//ownerDetail := connection.Owner
 		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName
+		relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner
 		fmt.Printf(relativeEntry + "\n")
 	}
 }
@@ -262,6 +265,7 @@ func appendConnections(allConnections, connections []Connection, level int) []Co
 		for j, existingConn := range allConnections {
 			present = compareConnections(conn, existingConn)
 			if present {
+				// Update the level if found a shorter path.
 				if existingConn.Level > level {
 					existingConn.Level = level
 					allConnections[j] = existingConn
@@ -285,117 +289,3 @@ func collectRelatives(relLeft, relRight []string) []string {
 	}
 	return relatives
 }
-
-func prepare_prev(relatives []string, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) []string {
-	fmt.Printf("((%v))\n", relatives)
-	fmt.Printf("&&%v&&\n", relativeNames)
-	relativesToSearch := make([]string,0)
-	for _, relativeName := range relativeNames {
-		found := false
-		for _, currentRelative := range relatives {
-			parts := strings.Split(currentRelative, " ")
-			partsTwoName := strings.Split(parts[2], ":")[1]
-			if partsTwoName == relativeName {
-				found = true
-			}
-		}
-		if !found {
-			relativesToSearch = append(relativesToSearch, relativeName)
-		}
-	}
-	for _, relativeName := range relativesToSearch {
-		levelStr := strconv.Itoa(level)
-		ownerDetail := getOwnerDetail(targetKind, relativeName, namespace)
-		//fmt.Printf("Owner Detail:%s\n", ownerDetail)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
-		//fmt.Printf("%s\n", relativeEntry)
-		present := false
-		for _, r := range relatives {
-			if r == relativeEntry {
-				present = true
-			}
-		}
-		if !present {
-			relatives = append(relatives, relativeEntry)
-		}
-	}
-	return relatives
-}
-
-func prepareAndSearchNextLevel(relatives []string, connections []Connection, level int, relativeNames []string, targetKind, namespace, relType, relDetail string) []string {
-	//fmt.Printf("((%v))\n", relatives)
-	//fmt.Printf("&&%v&&\n", relativeNames)
-	relativesToSearch := make([]string,0)
-	for _, relativeName := range relativeNames {
-		found := false
-		for _, currentRelative := range relatives {
-			parts := strings.Split(currentRelative, " ")
-			partsTwoName := strings.Split(parts[2], ":")[1]
-			if partsTwoName == relativeName {
-				found = true
-			}
-		}
-		if !found {
-			relativesToSearch = append(relativesToSearch, relativeName)
-		}
-	}
-	for _, relativeName := range relativesToSearch {
-		levelStr := strconv.Itoa(level)
-		ownerDetail := getOwnerDetail(targetKind, relativeName, namespace)
-		//fmt.Printf("Owner Detail:%s\n", ownerDetail)
-		relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + relDetail + " " + ownerDetail
-		//fmt.Printf("%s\n", relativeEntry)
-		present := false
-		for _, r := range relatives {
-			if r == relativeEntry {
-				present = true
-			}
-		}
-		if !present {
-			relatives = append(relatives, relativeEntry)
-		}
-	}
-	var subrelatives []string
-	for _, relativeName := range relativesToSearch {
-		subrelatives, connections = GetRelatives(relatives, connections, level, targetKind, relativeName, namespace)
-	}
-	for _, subrelative := range subrelatives {
-		relatives = append(relatives, subrelative)
-	}
-	return relatives
-}
-
-func checkContent(lhsContent interface{}, instanceName string) bool {
-	//var content interface{}
-	_, ok1 := lhsContent.(map[string]interface{})
-	if ok1 {
-		content := lhsContent.(map[string]interface{})
-		for _, value := range content {
-			//fmt.Printf("Key: Value:%s\n", key, value)
-			stringVal, ok := value.(string)
-			if ok {
-				if stringVal == instanceName {
-					fmt.Printf("*** FOUND *** value:%s\n", stringVal)
-					return true
-				}
-			} else {
-				return checkContent(value, instanceName)
-			}
-		}
-	}
-	_, ok2 := lhsContent.([]string)
-	if ok2 {
-		content := lhsContent.([]string)
-		for _, value := range content {
-				if strings.Contains(value, instanceName) {
-					parts := strings.Split(value, ":")
-					for _, part := range parts {
-						fmt.Printf("--- FOUND --- value:%s part:%s\n", value, part)
-						return true
-					}
-				}
-		}
-	}
-	return false
-}
-
