@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strconv"
+	"sort"
 	"path/filepath"
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/dynamic"
@@ -184,24 +185,89 @@ func printMaps() {
 func PrintRelatives(format string, connections []Connection) {
 	switch format {
 	case "flat": 
-		printConnectionsFlat(connections)
+		printConnections(connections, "flat")
 	case "tabbed":
 		printConnectionsTabs(connections)
 	case "default":
-		printConnections(connections)
+		printConnections(connections, "default")
+	case "json":
+		printConnectionsJSON(connections)
 	}
 }
 
-func printConnections(connections []Connection) {
+func printConnectionsJSON(connections []Connection) {
 	fmt.Printf("%v", connections)
 }
 
-func printConnectionsFlat(connections []Connection) {
+func adjustLevels(connections []Connection) []Connection {
+	for i, conni := range connections {
+		for _, connj := range connections {
+			// Update the level if parent-child relationship exists.
+			if conni.Name == connj.OwnerName && 
+			   conni.Kind == connj.OwnerKind && 
+			   conni.Namespace == connj.Namespace {
+			   conni.Level = connj.Level + 1
+			   connections[i] = conni
+			}
+		}
+	}
+	return connections
+}
+
+func printConnections(connections []Connection, printtype string) {
+	//path := make([]Connection, 0)
+	var path []Connection
+	pathnum := 0
 	for _, connection := range connections {
-		levelStr := strconv.Itoa(connection.Level)
+		//levelStr := strconv.Itoa(connection.Level)
+		if connection.Level == 1 {
+			if pathnum > 0 {
+				fmt.Printf("------ Path %d ------\n", pathnum)
+				//printNode(connections[0], printtype, "")
+				printPath(path, printtype)
+				//fmt.Printf("-----------\n")
+			}
+			pathnum = pathnum + 1
+			path = make([]Connection, 0)
+			path = append(path, connections[0])
+		}
+		if pathnum > 0 {
+			path = append(path, connection)
+		}
 		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
-		relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner
-		fmt.Printf(relativeEntry + "\n")
+		//relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner + " " + relType
+		//fmt.Printf(relativeEntry + "\n")
+	}
+	fmt.Printf("------ Path %d ------\n", pathnum)
+	//printNode(connections[0], printtype, "")
+	printPath(path, printtype)
+}
+
+func printNode(connection Connection, printtype, relType string) {
+	levelStr := strconv.Itoa(connection.Level)
+	//relType := connection.RelationType
+		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
+	var relativeEntry string
+	if printtype == "flat" {
+		relativeEntry = "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + relType
+	} else {
+		relativeEntry = "Level:" + levelStr + " " + connection.Kind + "/" + connection.Name + relType
+	}
+	fmt.Printf(relativeEntry + "\n")
+}
+
+func printPath(connections []Connection, printtype string) {
+	sort.Slice(connections, func(i, j int) bool {
+		return connections[i].Level < connections[j].Level
+	})
+	for i, connection := range connections {
+		var relationType string
+		if i > 0 {
+			relationType = " [related to " + connections[i-1].Kind + "/" + connections[i-1].Name +  " by:" + connection.RelationType + "]"
+		} else {
+			relationType = ""
+		}
+		printNode(connection, printtype, relationType)
 	}
 }
 
@@ -264,12 +330,19 @@ func appendConnections(allConnections, connections []Connection, level int) []Co
 		present := false
 		for j, existingConn := range allConnections {
 			present = compareConnections(conn, existingConn)
+			// Update the level if found a shorter path.
 			if present {
-				// Update the level if found a shorter path.
 				if existingConn.Level > level {
 					existingConn.Level = level
 					allConnections[j] = existingConn
 				}
+			}
+			if conn.Name == existingConn.OwnerName && 
+			   conn.Kind == existingConn.OwnerKind && 
+			   conn.Namespace == existingConn.Namespace {
+			   conn.Level = existingConn.Level + 1
+			   conn.RelationType = "owner reference"
+			   //allConnections[j] = existingConn
 			}
 		}
 		if !present {

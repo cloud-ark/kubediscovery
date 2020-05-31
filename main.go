@@ -13,8 +13,8 @@ import (
 func main() {
 	if len(os.Args) == 7  || len(os.Args) == 5 || len(os.Args) == 3 {
 		var kind, instance, namespace string
-		// kubediscovery composition Moodle moodle1 default
 		// kubediscovery connections Moodle moodle1 default -o flat
+		// kubediscovery composition Moodle moodle1 default
 		// kubediscovery man Moodle 
 		commandType := os.Args[1]
 		if commandType == "composition" {
