@@ -123,22 +123,25 @@ func readKindCompositionFile(inputKind string) error {
 		}
 		for _, crd := range crdList.Items {
 			crdName := crd.ObjectMeta.Name
+			//fmt.Printf("CRD NAME:%s\n", crdName)
 			crdObj, err := crdClient.CustomResourceDefinitions().Get(context.TODO(),
 													     			 crdName, 
 																	 metav1.GetOptions{})
 			if err != nil {
 				fmt.Errorf("Error:%s\n", err)
+				panic(err)
 				return err
 			}
 			//fmt.Printf("InputKind:%s, thisKind:%s\n", inputKind, crdObj.Spec.Names.Kind)
-			if inputKind != "" {
+			/*if inputKind != "" {
 				if inputKind == crdObj.Spec.Names.Kind {
 					parseCRDAnnotions(crdObj)
 					break
 				}
 			} else {
 				parseCRDAnnotions(crdObj)
-			}
+			}*/
+			parseCRDAnnotions(crdObj)
 		}
 	}
 	return nil

@@ -64,6 +64,8 @@ type Connection struct {
 	Owner           string
 	RelationType	string // built-in vs. defined
 	RelationDetails string 
+	OwnerKind 		string
+	OwnerName    	string
 	Peers           []Connection
 }
 
@@ -129,11 +131,19 @@ func init() {
 	kindVersionMap[DEPLOYMENT] = "apis/apps/v1"
 	kindGroupMap[DEPLOYMENT] = "apps"
 	compositionMap[DEPLOYMENT] = []string{"ReplicaSet"}
+	deploymentRelationships := make([]string,0)
+	depRel := "owner, of:ReplicaSet, value:INSTANCE.name"
+	deploymentRelationships = append(deploymentRelationships, depRel)
+	relationshipMap[DEPLOYMENT] = deploymentRelationships
 
 	KindPluralMap[REPLICA_SET] = "replicasets"
 	kindVersionMap[REPLICA_SET] = "apis/extensions/v1beta1"
 	kindGroupMap[REPLICA_SET] = "extensions"
 	compositionMap[REPLICA_SET] = []string{"Pod"}
+	replicasetRelationships := make([]string,0)
+	replicasetRel := "owner, of:Pod, value:INSTANCE.name"
+	replicasetRelationships = append(replicasetRelationships, replicasetRel)
+	relationshipMap[REPLICA_SET] = replicasetRelationships
 
 	KindPluralMap[DAEMONSET] = "daemonsets"
 	kindVersionMap[DAEMONSET] = "apis/extensions/v1beta1"
@@ -173,6 +183,15 @@ func init() {
 	serviceRel := "label, on:Pod, value:INSTANCE.spec.selector"
 	serviceRelationships = append(serviceRelationships, serviceRel)
 	relationshipMap[SERVICE] = serviceRelationships
+
+	KindPluralMap[INGRESS] = "ingresses"
+	kindVersionMap[INGRESS] = "extensions/v1beta1"
+	kindGroupMap[INGRESS] = "networking.k8s.io"
+	compositionMap[INGRESS] = []string{}
+	ingressRelationships := make([]string,0)
+	ingressRel := "specproperty, on:INSTANCE.spec.rules.http.paths.backend.serviceName, value:Service.spec.metadata.name"
+	ingressRelationships = append(ingressRelationships, ingressRel)
+	relationshipMap[INGRESS] = ingressRelationships
 
 	KindPluralMap[SECRET] = "secrets"
 	kindVersionMap[SECRET] = "api/v1"
