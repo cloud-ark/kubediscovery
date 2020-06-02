@@ -37,8 +37,14 @@ func main() {
 			}
 			level := 0
 			connections := make([]discovery.Connection, 0)
-			connections = discovery.GetRelatives(connections, level, kind, instance, namespace)
-			discovery.PrintRelatives(format, connections)
+			relationType := ""
+			origkind := kind
+			originstance := instance
+			connections = discovery.GetRelatives(connections, level, kind, instance, origkind, originstance, 
+												 namespace, relationType)
+			if len(connections) > 0 {
+				discovery.PrintRelatives(format, connections)
+			}
 		}
 		if commandType == "man" {
 			kind := os.Args[2]
