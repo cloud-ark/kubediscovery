@@ -217,12 +217,17 @@ func adjustLevels(connections []Connection) []Connection {
 func printConnections(connections []Connection, printtype string) {
 	//path := make([]Connection, 0)
 	var path []Connection
+	//Color: https://twinnation.org/articles/35/how-to-add-colors-to-your-console-terminal-output-in-go
+	green := "\033[32m"
+	reset := "\033[0m"
+
 	pathnum := 0
+	//fmt.Printf("Output Connections: %v\n", connections)
 	for _, connection := range connections {
 		//levelStr := strconv.Itoa(connection.Level)
 		if connection.Level == 1 {
 			if pathnum > 0 {
-				fmt.Printf("------ Path %d ------\n", pathnum)
+				fmt.Printf(green + "------ Branch %d ------\n" + reset, pathnum)
 				//printNode(connections[0], printtype, "")
 				printPath(path, printtype)
 				//fmt.Printf("-----------\n")
@@ -238,7 +243,7 @@ func printConnections(connections []Connection, printtype string) {
 		//relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner + " " + relType
 		//fmt.Printf(relativeEntry + "\n")
 	}
-	fmt.Printf("------ Path %d ------\n", pathnum)
+	fmt.Printf(green + "------ Branch %d ------\n" + reset, pathnum)
 	//printNode(connections[0], printtype, "")
 	printPath(path, printtype)
 }
@@ -263,7 +268,12 @@ func printPath(connections []Connection, printtype string) {
 	for i, connection := range connections {
 		var relationType string
 		if i > 0 {
-			relationType = " [related to " + connections[i-1].Kind + "/" + connections[i-1].Name +  " by:" + connection.RelationType + "]"
+			if connection.Peer != nil {
+				relationType = " [related to " + connection.Peer.Kind + "/" + connection.Peer.Name +  " by:" + connection.RelationType + "]"
+			} else {
+				//relationType = " [related to " + connections[i-1].Kind + "/" + connections[i-1].Name +  " by:" + connection.RelationType + "]"
+				relationType = " [related by:" + connection.RelationType + "]"				
+			}
 		} else {
 			relationType = ""
 		}
@@ -289,8 +299,8 @@ func compareConnections(c1, c2 Connection) bool {
 		return false
 	} else if c1.Namespace != c2.Namespace {
 		return false
-	} else if c1.Owner != c2.Owner {
-		return false
+	//} else if c1.Owner != c2.Owner {
+	//	return false
 	} else {
 		return true
 	}
@@ -325,25 +335,29 @@ func appendRelatives(allRelatives, relatives []string) []string {
 	return allRelatives
 }
 
-func appendConnections(allConnections, connections []Connection, level int) []Connection {
+func appendConnections(allConnections, connections []Connection) []Connection {
 	for _, conn := range connections {
 		present := false
 		for j, existingConn := range allConnections {
 			present = compareConnections(conn, existingConn)
 			// Update the level if found a shorter path.
 			if present {
-				if existingConn.Level > level {
-					existingConn.Level = level
+				//if existingConn.Level > level {
+				if existingConn.Level > conn.Level {
+					//existingConn.Level = level
+					existingConn.Level = conn.Level
+					//fmt.Printf("ExistingLevel:%d, InputLevel:%d\n", existingConn.Level, level)
+					//existingConn.Peer = conn.Peer 
 					allConnections[j] = existingConn
 				}
+				break
 			}
-			if conn.Name == existingConn.OwnerName && 
+/*			if conn.Name == existingConn.OwnerName && 
 			   conn.Kind == existingConn.OwnerKind && 
 			   conn.Namespace == existingConn.Namespace {
 			   conn.Level = existingConn.Level + 1
 			   conn.RelationType = "owner reference"
-			   //allConnections[j] = existingConn
-			}
+			}*/
 		}
 		if !present {
 			allConnections = append(allConnections, conn)
@@ -362,3 +376,55 @@ func collectRelatives(relLeft, relRight []string) []string {
 	}
 	return relatives
 }
+
+func filterRelatives(connections []Connection, relativeNames []string) []string {
+	relativesToSearch := make([]string,0)
+	for _, relativeName := range relativeNames {
+		found := false
+		for _, currentRelative := range connections {
+			if currentRelative.Name == relativeName {
+				found = true
+			}
+		}
+		if !found {
+			relativesToSearch = append(relativesToSearch, relativeName)
+		}
+	}
+	return relativesToSearch
+}
+
+func checkHistory(connections []Connection, kind, instance, namespace string) bool {
+	present := false
+	for _, conn := range connections {
+		if conn.Name == instance &&
+		   conn.Kind == kind &&
+		   conn.Namespace == namespace {
+		   	present = true
+		}
+	}
+	return present
+}
+
+func searchOwnerGraph(connections, owners []Connection, level int) []Connection {
+	level = level + 1
+	unseenOwners := make([]Connection,0)
+	for _, owner := range owners {
+		present := false
+		for _, connection := range connections {
+			if connection.Name == owner.Name && connection.Kind == owner.Kind && connection.Namespace == owner.Namespace {
+				present = true
+			}
+		}
+		if !present {
+			unseenOwners = append(unseenOwners, owner)
+		}
+	}
+	for _, relative := range unseenOwners {
+		kind := relative.Kind
+		name := relative.Name
+		namespace := relative.Namespace
+		connections = GetRelatives(connections, level, kind, name, "", "", namespace, "")
+	}
+	return connections
+} 
+

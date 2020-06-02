@@ -62,11 +62,11 @@ type Connection struct {
 	Name            string
 	Namespace       string
 	Owner           string
-	RelationType	string // built-in vs. defined
+	RelationType	string
 	RelationDetails string 
 	OwnerKind 		string
 	OwnerName    	string
-	Peers           []Connection
+	Peer           *Connection
 }
 
 var (
