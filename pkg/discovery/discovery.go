@@ -165,7 +165,9 @@ func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
 	//fmt.Printf("&&&&\n")
 	compositionAnnotation := annotations[COMPOSITION_ANNOTATION]
 	if compositionAnnotation != "" {
-		compositionMap[kind] = strings.Split(compositionAnnotation, ",")
+		componentKinds := strings.Split(compositionAnnotation, ",")
+		compositionMap[kind] = componentKinds
+		crdcompositionMap[kind] = componentKinds
 	}
 	//fmt.Printf("=====\n")
 	allRels := getAllRelationships(annotations)
@@ -344,11 +346,11 @@ func getComposition(kind, name, namespace, status string, level int, composition
 	return parentComposition
 }
 
-func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, namespace string) string {
+func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, namespace string) []Composition {
 	cp.mux.Lock()
 	defer cp.mux.Unlock()
-	var compositionBytes []byte
-	var compositionString string
+	//var compositionBytes []byte
+	//var compositionString string
 	compositions := []Composition{}
 	resourceKindPlural := KindPluralMap[resourceKind]
 	//fmt.Println("Compositions of different Kinds in this Cluster")
@@ -393,12 +395,20 @@ func (cp *ClusterCompositions) GetCompositions(resourceKind, resourceName, names
 			break
 		}
 	}
+	return compositions
+}
+
+func (cp *ClusterCompositions) GetCompositionsString(resourceKind, resourceName, namespace string) string {
+
+	compositions := cp.GetCompositions(resourceKind,
+									resourceName,
+									namespace)
 
 	compositionBytes, err := json.Marshal(compositions)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
-	compositionString = string(compositionBytes)
+	compositionString := string(compositionBytes)
 	return compositionString
 }
 

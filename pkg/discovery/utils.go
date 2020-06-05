@@ -218,19 +218,15 @@ func printConnections(connections []Connection, printtype string) {
 	//path := make([]Connection, 0)
 	var path []Connection
 	//Color: https://twinnation.org/articles/35/how-to-add-colors-to-your-console-terminal-output-in-go
-	green := "\033[32m"
-	reset := "\033[0m"
 
 	pathnum := 0
 	//fmt.Printf("Output Connections: %v\n", connections)
+	fmt.Printf("\n::Final connections graph::\n")
 	for _, connection := range connections {
-		//levelStr := strconv.Itoa(connection.Level)
 		if connection.Level == 1 {
 			if pathnum > 0 {
-				fmt.Printf(green + "------ Branch %d ------\n" + reset, pathnum)
-				//printNode(connections[0], printtype, "")
+				fmt.Printf("------ Branch %d ------\n", pathnum)
 				printPath(path, printtype)
-				//fmt.Printf("-----------\n")
 			}
 			pathnum = pathnum + 1
 			path = make([]Connection, 0)
@@ -243,15 +239,13 @@ func printConnections(connections []Connection, printtype string) {
 		//relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner + " " + relType
 		//fmt.Printf(relativeEntry + "\n")
 	}
-	fmt.Printf(green + "------ Branch %d ------\n" + reset, pathnum)
-	//printNode(connections[0], printtype, "")
+	fmt.Printf("------ Branch %d ------\n", pathnum)
 	printPath(path, printtype)
 }
 
 func printNode(connection Connection, printtype, relType string) {
 	levelStr := strconv.Itoa(connection.Level)
-	//relType := connection.RelationType
-		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
+
 	var relativeEntry string
 	if printtype == "flat" {
 		relativeEntry = "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + relType
@@ -269,9 +263,21 @@ func printPath(connections []Connection, printtype string) {
 		var relationType string
 		if i > 0 {
 			if connection.Peer != nil {
-				relationType = " [related to " + connection.Peer.Kind + "/" + connection.Peer.Name +  " by:" + connection.RelationType + "]"
+				relType := ""
+				switch connection.RelationType {
+				case relTypeLabel:
+					relType = relType + green + connection.RelationType + reset
+				case relTypeSpecProperty:
+					relType = relType + purple + connection.RelationType + reset
+				case relTypeEnvvariable:
+					relType = relType + red + connection.RelationType + reset
+				case relTypeAnnotation:
+					relType = relType + yellow + connection.RelationType + reset
+				case relTypeOwnerReference:
+					relType = relType + cyan + connection.RelationType + reset
+				}
+				relationType = " [related to " + connection.Peer.Kind + "/" + connection.Peer.Name +  " by:" + relType + "]"
 			} else {
-				//relationType = " [related to " + connections[i-1].Kind + "/" + connections[i-1].Name +  " by:" + connection.RelationType + "]"
 				relationType = " [related by:" + connection.RelationType + "]"				
 			}
 		} else {
@@ -299,8 +305,8 @@ func compareConnections(c1, c2 Connection) bool {
 		return false
 	} else if c1.Namespace != c2.Namespace {
 		return false
-	//} else if c1.Owner != c2.Owner {
-	//	return false
+	} else if c1.Level != c2.Level {
+		return false
 	} else {
 		return true
 	}
@@ -335,29 +341,36 @@ func appendRelatives(allRelatives, relatives []string) []string {
 	return allRelatives
 }
 
-func appendConnections(allConnections, connections []Connection) []Connection {
+func AppendConnections(allConnections []Connection, connection Connection) []Connection {
+	present := false
+	for _, conn := range allConnections {
+		present = compareConnections(conn, connection)
+		if present {
+			break
+		}
+	}
+	if !present {
+		allConnections = append(allConnections, connection)
+	}
+	return allConnections
+}
+
+func appendConnections1(allConnections, connections []Connection) []Connection {
 	for _, conn := range connections {
 		present := false
 		for j, existingConn := range allConnections {
 			present = compareConnections(conn, existingConn)
 			// Update the level if found a shorter path.
 			if present {
-				//if existingConn.Level > level {
+				//fmt.Printf("ExistingConn.Name:%s, ExistingConn.Level:%d, conn.Name:%s, conn.Level:%d\n", existingConn.Name, existingConn.Level, conn.Name, conn.Level)
 				if existingConn.Level > conn.Level {
-					//existingConn.Level = level
 					existingConn.Level = conn.Level
-					//fmt.Printf("ExistingLevel:%d, InputLevel:%d\n", existingConn.Level, level)
-					//existingConn.Peer = conn.Peer 
+					//existingConn.Peer = conn.Peer
+					//fmt.Printf("ExistingLevel:%d, InputLevel:%d\n", existingConn.Level, level) 
 					allConnections[j] = existingConn
 				}
 				break
 			}
-/*			if conn.Name == existingConn.OwnerName && 
-			   conn.Kind == existingConn.OwnerKind && 
-			   conn.Namespace == existingConn.Namespace {
-			   conn.Level = existingConn.Level + 1
-			   conn.RelationType = "owner reference"
-			}*/
 		}
 		if !present {
 			allConnections = append(allConnections, conn)

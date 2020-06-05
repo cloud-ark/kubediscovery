@@ -22,7 +22,7 @@ func main() {
 			instance = os.Args[3]
 			namespace = os.Args[4]
 			discovery.BuildCompositionTree(namespace)
-			composition := discovery.TotalClusterCompositions.GetCompositions(kind,
+			composition := discovery.TotalClusterCompositions.GetCompositionsString(kind,
 																			  instance,
 																			  namespace)
 			fmt.Printf("%s\n", composition)
@@ -40,10 +40,18 @@ func main() {
 			relationType := ""
 			origkind := kind
 			originstance := instance
+			/*rootNode := discovery.Connection{
+				Name: instance,
+				Kind: kind,
+				Namespace: namespace,
+				Level: 0,
+			}*/
+			discovery.BuildCompositionTree(namespace)
+			//discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, rootNode)
 			connections = discovery.GetRelatives(connections, level, kind, instance, origkind, originstance, 
 												 namespace, relationType)
-			if len(connections) > 0 {
-				discovery.PrintRelatives(format, connections)
+			if len(discovery.TotalClusterConnections) > 0 {
+				discovery.PrintRelatives(format, discovery.TotalClusterConnections)
 			}
 		}
 		if commandType == "man" {

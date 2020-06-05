@@ -78,12 +78,14 @@ var (
 	SPECPROPERTY_REL_ANNOTATION string
 
 	TotalClusterCompositions ClusterCompositions
+	TotalClusterConnections []Connection
 
 	KindPluralMap  map[string]string
 	kindVersionMap map[string]string
 	kindGroupMap map[string]string
 	compositionMap map[string][]string
 	relationshipMap map[string][]string
+	crdcompositionMap map[string][]string
 
 	REPLICA_SET  string
 	DEPLOYMENT   string
@@ -99,6 +101,14 @@ var (
 	DAEMONSET    string
 	RC           string
 	PDB 		 string
+
+	relTypeLabel string
+	relTypeSpecProperty string
+	relTypeEnvvariable string
+	relTypeAnnotation string
+	relTypeOwnerReference string
+
+	green, red, yellow, purple, cyan, reset string
 )
 
 func init() {
@@ -119,10 +129,24 @@ func init() {
 	RC = "ReplicationController"
 	PDB = "PodDisruptionBudget"
 
+	relTypeLabel = "label"
+	relTypeSpecProperty = "specproperty"
+	relTypeEnvvariable = "envvariable"
+	relTypeAnnotation = "annotation"
+	relTypeOwnerReference = "owner reference"
+
+	green = "\033[32m"
+	red   = "\033[31m"
+	yellow = "\033[33m"
+	purple = "\033[35m"
+	cyan   = "\033[36m"
+	reset = "\033[0m"
+
 	KindPluralMap = make(map[string]string)
 	// TODO: Change this to map[string][]string to support multiple versions
 	kindVersionMap = make(map[string]string) 
 	compositionMap = make(map[string][]string, 0)
+	crdcompositionMap = make(map[string][]string, 0)
 	kindGroupMap = make(map[string]string)
 	relationshipMap = make(map[string][]string)
 
@@ -132,7 +156,7 @@ func init() {
 	kindGroupMap[DEPLOYMENT] = "apps"
 	compositionMap[DEPLOYMENT] = []string{"ReplicaSet"}
 	deploymentRelationships := make([]string,0)
-	depRel := "owner, of:ReplicaSet, value:INSTANCE.name"
+	depRel := "owner reference, of:ReplicaSet, value:INSTANCE.name"
 	deploymentRelationships = append(deploymentRelationships, depRel)
 	relationshipMap[DEPLOYMENT] = deploymentRelationships
 
@@ -141,7 +165,7 @@ func init() {
 	kindGroupMap[REPLICA_SET] = "extensions"
 	compositionMap[REPLICA_SET] = []string{"Pod"}
 	replicasetRelationships := make([]string,0)
-	replicasetRel := "owner, of:Pod, value:INSTANCE.name"
+	replicasetRel := "owner reference, of:Pod, value:INSTANCE.name"
 	replicasetRelationships = append(replicasetRelationships, replicasetRel)
 	relationshipMap[REPLICA_SET] = replicasetRelationships
 
@@ -217,6 +241,12 @@ func init() {
 	kindVersionMap[STATEFULSET] = "apis/apps/v1"
 	kindGroupMap[STATEFULSET] = "apps"
 	compositionMap[STATEFULSET] = []string{"Pod", "ReplicaSet"}
+	ssetRelationships := make([]string,0)
+	ssRel1 := "owner reference, of:ReplicaSet, value:INSTANCE.name"
+	ssetRelationships = append(ssetRelationships, ssRel1)
+	ssRel2 := "owner reference, of:Pod, value:INSTANCE.name"
+	ssetRelationships = append(ssetRelationships, ssRel2)	
+	relationshipMap[STATEFULSET] = ssetRelationships
 
 	KindPluralMap[CONFIG_MAP] = "configmaps"
 	kindVersionMap[CONFIG_MAP] = "api/v1"
