@@ -240,7 +240,7 @@ func handleCompositionEndpoint(request *restful.Request, response *restful.Respo
 
 	discovery.BuildCompositionTree(namespace)
 
-	compositionInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind,
+	compositionInfo := discovery.TotalClusterCompositions.GetCompositionsString(resourceKind,
 																		  resourceInstance,
 																		  namespace)
 	fmt.Printf("Composition:%v\n", compositionInfo)
@@ -308,7 +308,7 @@ func getCompositions(request *restful.Request, response *restful.Response) {
 	resourceNamespace := resourcePathSlice[5]
 	fmt.Printf("Resource Kind:%s, Resource name:%s\n", resourceKind, resourceName)
 
-	compositionsInfo := discovery.TotalClusterCompositions.GetCompositions(resourceKind, resourceName, resourceNamespace)
+	compositionsInfo := discovery.TotalClusterCompositions.GetCompositionsString(resourceKind, resourceName, resourceNamespace)
 	fmt.Printf("Compositions Info:%v", compositionsInfo)
 
 	response.Write([]byte(compositionsInfo))
