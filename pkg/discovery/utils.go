@@ -305,10 +305,37 @@ func compareConnections(c1, c2 Connection) bool {
 		return false
 	} else if c1.Namespace != c2.Namespace {
 		return false
-	} else if c1.Level != c2.Level {
+	} else {
+		return true
+	}
+}
+
+func compareConnectionsRelType(c1, c2 Connection) bool {
+	if c1.Kind != c2.Kind {
+		return false
+	} else if c1.Name != c2.Name {
+		return false
+	} else if c1.Namespace != c2.Namespace {
+		return false
+	} else if c1.RelationType != c2.RelationType {
 		return false
 	} else {
 		return true
+	}
+}
+
+
+func comparePeers(c1, c2 Connection) bool {
+	if c1.Peer != nil && c2.Peer != nil {
+		if c1.Peer.Name != c2.Peer.Name {
+			return false
+		} else if c1.Peer.Kind != c2.Peer.Kind {
+			return false
+		} else {
+			return true
+		}
+	} else {
+		return true		
 	}
 }
 
@@ -341,18 +368,151 @@ func appendRelatives(allRelatives, relatives []string) []string {
 	return allRelatives
 }
 
+func checkPeerPresent(allConnections []Connection, peer, conn Connection) bool {
+	for _, c := range allConnections {
+		if c.Name == peer.Name && c.Kind == peer.Kind {
+			if c.Peer.Name == conn.Name && c.Peer.Kind == conn.Kind {
+				fmt.Printf("c:%v\n", c)
+				fmt.Printf("peer:%v\n", peer)
+				fmt.Printf("conn:%v\n", conn)
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func AppendConnections2(allConnections []Connection, connection Connection) []Connection {
+	allConnections = append(allConnections, connection)
+	return allConnections
+}
+
+func removeDuplicates(allConnections []Connection) {
+	//nondupeconnections := make([]Connection,0)
+
+	//for i, c1 := range allConnections {
+
+	//}
+}
+
 func AppendConnections(allConnections []Connection, connection Connection) []Connection {
 	present := false
-	for _, conn := range allConnections {
-		present = compareConnections(conn, connection)
+	present2 := false
+	//fmt.Printf("----ABC----\n")
+	for i, conn := range allConnections {
+		if connection.Kind == "MysqlCluster" && (*connection.Peer).Kind == "Service" {
+			fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
+		}
+		//present = compareConnectionsRelType(conn, connection) /// working
+
+		if conn.Kind == connection.Peer.Kind && conn.Name == connection.Peer.Name {
+			if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
+
+			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)
+				//present = compareConnections(conn, connection)
+				present = true
+			}
+		}
 		if present {
+			if connection.Level < conn.Level {
+				conn.Level = connection.Level 
+				allConnections[i] = conn
+			}
 			break
+		}
+	}
+	if !present {
+		for _, conn := range allConnections {
+			present2 = compareConnectionsRelType(conn, connection)
+			if present2 {
+				break
+			}
+		}
+		if !present2 {
+			allConnections = append(allConnections, connection)
+		}
+	} 
+	return allConnections
+}
+
+func AppendEdge(allConnections []Connection, connection Connection) []Connection {
+	kind := connection.Peer.Kind
+	name := connection.Peer.Name
+	namespace := connection.Peer.Namespace
+	present := false
+	for _, conn := range allConnections {
+		if conn.Name == name && conn.Kind == kind && conn.Namespace == namespace {
+			if conn.Peer.Name == connection.Name && conn.Peer.Kind == connection.Kind && conn.Peer.Namespace == connection.Namespace {
+				if conn.RelationType == connection.RelationType {
+					present = true
+					break
+				}
+			}
 		}
 	}
 	if !present {
 		allConnections = append(allConnections, connection)
 	}
 	return allConnections
+}
+
+func AppendEdge1(allConnections []Connection, connection Connection, peer Connection) []Connection {
+/*	present1 := false
+	present2 := false
+	store := false
+	for _, conn := range allConnections {
+		present1 = compareEdge(conn, connection)
+		present1 = compareConnection(conn, *connection.Peer)
+		if present1 || present2 {
+			break
+		}
+	}
+	if !present || !present2 {
+		allConnections = append(allConnections, connection)
+	}*/
+	present1 := false
+	present2 := false
+	for _, conn := range allConnections {
+		present1 = compareEdge(conn, connection, peer)
+		if present1 {
+			break
+		}
+	}
+	for _, conn := range allConnections {
+		present2 = compareConnections(conn, connection)
+		if present2 {
+			break
+		}
+	}
+	if !present1 {
+		allConnections = AppendConnections(allConnections, connection)
+	} else if !present2 {
+		allConnections = AppendConnections(allConnections, connection)
+	}
+	return allConnections
+}
+
+func compareEdge(c1, c2, c3 Connection) bool {
+	if c1.Kind == c2.Kind && c1.Name == c2.Name && c1.Namespace == c2.Namespace {
+		if c1.Peer.Kind == c3.Kind && c1.Peer.Name == c3.Name && c1.Peer.Namespace == c3.Namespace {
+			if c1.RelationType == c3.RelationType {
+				return true
+			}
+		}
+	}
+	return false
+/*	if c1.Kind != c2.Kind {
+		return false
+	} else if c1.Name != c2.Name {
+		return false
+	} else if c1.Namespace != c2.Namespace {
+		return false
+	} else if c1.RelationType != c2.RelationType {
+		return false 
+	} else {
+		return true
+	}
+*/
 }
 
 func appendConnections1(allConnections, connections []Connection) []Connection {
@@ -389,6 +549,23 @@ func collectRelatives(relLeft, relRight []string) []string {
 	}
 	return relatives
 }
+
+func filterConnections1(connections []Connection, relativeNames []string) []string {
+	relativesToSearch := make([]string,0)
+	for _, relativeName := range relativeNames {
+		found := false
+		for _, currentRelative := range connections {
+			if currentRelative.Name == relativeName {
+				found = true
+			}
+		}
+		if !found {
+			relativesToSearch = append(relativesToSearch, relativeName)
+		}
+	}
+	return relativesToSearch
+}
+
 
 func filterRelatives(connections []Connection, relativeNames []string) []string {
 	relativesToSearch := make([]string,0)

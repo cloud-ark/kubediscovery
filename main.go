@@ -40,14 +40,20 @@ func main() {
 			relationType := ""
 			origkind := kind
 			originstance := instance
-			/*rootNode := discovery.Connection{
+			discovery.BuildCompositionTree(namespace)
+			root := discovery.Connection{
 				Name: instance,
 				Kind: kind,
 				Namespace: namespace,
-				Level: 0,
-			}*/
-			discovery.BuildCompositionTree(namespace)
-			//discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, rootNode)
+				Level: level,
+				Peer: &discovery.Connection{
+					Name: "",
+					Kind: "",
+					Namespace: "",
+				},
+			}
+			discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
+			
 			connections = discovery.GetRelatives(connections, level, kind, instance, origkind, originstance, 
 												 namespace, relationType)
 			if len(discovery.TotalClusterConnections) > 0 {
