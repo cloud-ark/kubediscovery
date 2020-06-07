@@ -19,9 +19,9 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 		return connections
 	}
 	exists := checkExistence(kind, instance, namespace)
-	//fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s\n", level, kind, instance, origkind, originstance)
-	if exists {
 
+	if exists {
+	//fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s\n", level, kind, instance, origkind, originstance)
 		fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)	
 		if kind != origkind && instance != originstance {
 			node := Connection{
@@ -127,25 +127,21 @@ func findRelatives(connections []Connection, level int, kind, instance, origkind
 	if len(unseenRelatives) == 0 {
 		TotalClusterConnections = AppendConnections(TotalClusterConnections, inputInstance)
 	}
-	//if len(unseenRelatives) > 0 {
-		currentConnections := prepare(level, kind, instance, connections, unseenRelatives, kind, namespace, relType, "")
-		connections = appendCurrentLevelPeers(connections, currentConnections, level)
 
-		level = level + 1
-		relStringList := relationshipMap[kind]
-		connections = findDownstreamRelatives(connections, level, kind, instance, namespace, relStringList)
-		for _, relatedKind := range relatedKindList {
-			relStringList = relationshipMap[relatedKind]
-			connections = findUpstreamRelatives(connections, level, relatedKind, instance, namespace, relStringList)
-		}
-		connections = findParentConnections(connections, level, kind, instance, namespace)
-		connections = findChildrenConnections(connections, level, kind, instance, namespace)
-		connections = findCompositionConnections(connections, level, kind, instance, namespace)
-		connections = setPeers(connections, kind, instance, origkind, originstance, namespace, level)
-	/*} else {
-		//trackEdges(connections, level, relType, kind, instance, namespace)
+	currentConnections := prepare(level, kind, instance, connections, unseenRelatives, kind, namespace, relType, "")
+	connections = appendCurrentLevelPeers(connections, currentConnections, level)
 
-	}*/
+	level = level + 1
+	relStringList := relationshipMap[kind]
+	connections = findDownstreamRelatives(connections, level, kind, instance, namespace, relStringList)
+	for _, relatedKind := range relatedKindList {
+		relStringList = relationshipMap[relatedKind]
+		connections = findUpstreamRelatives(connections, level, relatedKind, instance, namespace, relStringList)
+	}
+	connections = findParentConnections(connections, level, kind, instance, namespace)
+	connections = findChildrenConnections(connections, level, kind, instance, namespace)
+	connections = findCompositionConnections(connections, level, kind, instance, namespace)
+	connections = setPeers(connections, kind, instance, origkind, originstance, namespace, level)
 	return connections
 }
 
@@ -207,7 +203,6 @@ func findUpstreamRelatives(connections []Connection, level int, kind, targetInst
 
 func buildGraph(connections []Connection, level int, kind, instance string, relativesNames []Connection, targetKind, namespace, relType, relDetail string) ([]Connection) {
 	currentConnections := prepare(level, kind, instance, connections, relativesNames, targetKind, namespace, relType, relDetail)
-	//trackEdges(currentConnections, level, relType, kind, instance, namespace)
 	unseenRelatives := filterConnections(connections, relativesNames)
 	//fmt.Printf("UnseenRelatives:%v\n", unseenRelatives)
 	connections = appendCurrentLevelPeers(connections, currentConnections, level)
@@ -216,22 +211,6 @@ func buildGraph(connections []Connection, level int, kind, instance string, rela
 	//fmt.Printf("NextLevelConn:%v\n", nextLevelConnections)
 	connections = appendNextLevelPeers(connections, nextLevelConnections)
 	return connections
-}
-
-func trackEdges(nodes []Connection, level int, relType, kind, instance, namespace string) {
-	fmt.Printf("Tot1:%v\n", TotalClusterConnections)
-	for _, node := range nodes {
-		newNode := deepCopy(node)
-		newNode.Peer = &Connection{
-			Name: instance,
-			Kind: kind,
-			Namespace: namespace,
-		}
-		newNode.Level = level
-		newNode.RelationType = relType
-		TotalClusterConnections = AppendEdge(TotalClusterConnections, newNode)
-	}
-	fmt.Printf("Tot2:%v\n", TotalClusterConnections)
 }
 
 func setPeers(connections []Connection, kind, instance, origkind, originstance, namespace string, origlevel int) []Connection {
@@ -243,20 +222,7 @@ func setPeers(connections []Connection, kind, instance, origkind, originstance, 
 				Name: originstance,
 				Namespace: namespace,
 			   }
-			   /*foundconn := searchConnection(connections, origkind, originstance, namespace)
-			   conn.Peer = &foundconn
-			   conn.Level = foundconn.Level + 1
-			   newConn := deepCopy(conn)
-			   connections[i] = newConn
-			   */
-			} /*else {
-				peerLevel := getLevel(connections, *conn.Peer)
-				if conn.Level < peerLevel {
-					conn.Level = peerLevel + 1
-					newConn := deepCopy(conn)
-					connections[i] = newConn
-				}
-			}*/
+			} 
 		}
 	}
 	return connections
@@ -307,7 +273,6 @@ func filterConnections(allConnections []Connection, currentConnections []Connect
 			if currentConn.Name == conn.Name && 
 			   currentConn.Kind == conn.Kind && 
 			   currentConn.Namespace == conn.Namespace {
-			   //currentConn.RelationType == conn.RelationType {
 				found = true
 				if currentConn.Level < conn.Level {
 					conn.Level = currentConn.Level
@@ -363,10 +328,6 @@ func prepare(level int, kind, instance string, connections, relativeNames []Conn
 			RelationDetails: relDetail,
 		}
 		if kind != targetKind && instance != relativeName {
-			/*foundconn := searchConnection(connections, kind, instance, namespace)
-			connection.Peer = &foundconn
-			connection.Level = foundconn.Level + 1
-			*/
 			connection.Peer = &Connection{
 				Name: instance, 
 				Kind: kind,
@@ -385,10 +346,8 @@ func findCompositionConnections(connections []Connection, level int, kind, insta
 
 	composition := TotalClusterCompositions.GetCompositions(kind, instance, namespace)
 	childrenConnections := make([]Connection, 0)
-	//var comp Composition
+
 	for _, comp := range composition {
-		//comp = compoutput.(Composition)
-		//comp = composition[0]
 		if comp.Level == 1 {
 			children := comp.Children
 			for _, child := range children {
@@ -456,8 +415,6 @@ func findParentConnections(connections []Connection, level int, kind, instance, 
 			for _, conn := range owners {
 				TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
 			}
-			//TotalClusterConnections = AppendConnections(TotalClusterConnections, peer)
-			//trackEdges(owners, level, relTypeOwnerReference, kind, instance, namespace)				
 		}
 	}
 	return connections
@@ -515,8 +472,6 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 			}
 		}
 	} else {
-		//TotalClusterConnections = AppendConnections(TotalClusterConnections, peer)
-		//trackEdges(childs, level, relTypeOwnerReference, kind, instance, namespace)
 		//fmt.Printf("Child:%v\n", childs)
 		//fmt.Printf("TotalClusterConnections:%v\n", TotalClusterConnections)
 		for _, conn := range childs {

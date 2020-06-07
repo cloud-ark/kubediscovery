@@ -235,9 +235,6 @@ func printConnections(connections []Connection, printtype string) {
 		if pathnum > 0 {
 			path = append(path, connection)
 		}
-		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
-		//relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner + " " + relType
-		//fmt.Printf(relativeEntry + "\n")
 	}
 	fmt.Printf("------ Branch %d ------\n", pathnum)
 	printPath(path, printtype)
@@ -382,19 +379,6 @@ func checkPeerPresent(allConnections []Connection, peer, conn Connection) bool {
 	return false
 }
 
-func AppendConnections2(allConnections []Connection, connection Connection) []Connection {
-	allConnections = append(allConnections, connection)
-	return allConnections
-}
-
-func removeDuplicates(allConnections []Connection) {
-	//nondupeconnections := make([]Connection,0)
-
-	//for i, c1 := range allConnections {
-
-	//}
-}
-
 func AppendConnections(allConnections []Connection, connection Connection) []Connection {
 	present := false
 	present2 := false
@@ -409,7 +393,6 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 			if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
 
 			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)
-				//present = compareConnections(conn, connection)
 				present = true
 			}
 		}
@@ -621,4 +604,20 @@ func searchOwnerGraph(connections, owners []Connection, level int) []Connection 
 	}
 	return connections
 } 
+
+func trackEdges(nodes []Connection, level int, relType, kind, instance, namespace string) {
+	fmt.Printf("Tot1:%v\n", TotalClusterConnections)
+	for _, node := range nodes {
+		newNode := deepCopy(node)
+		newNode.Peer = &Connection{
+			Name: instance,
+			Kind: kind,
+			Namespace: namespace,
+		}
+		newNode.Level = level
+		newNode.RelationType = relType
+		TotalClusterConnections = AppendEdge(TotalClusterConnections, newNode)
+	}
+	fmt.Printf("Tot2:%v\n", TotalClusterConnections)
+}
 
