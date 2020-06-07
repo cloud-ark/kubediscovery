@@ -58,6 +58,8 @@ func getDynamicClient() (dynamic.Interface, error) {
 	return dynamicClient, err
 }
 
+// Composition utility functions
+
 func getComposition1(kind, name, status string, compositionTree *[]CompositionTreeNode) Composition {
 	var compositionString string
 	fmt.Printf("Kind: %s Name: %s Composition:\n", kind, name)
@@ -182,6 +184,8 @@ func printMaps() {
 	}
 }
 
+// Connection utility functions
+
 func PrintRelatives(format string, connections []Connection) {
 	switch format {
 	case "flat": 
@@ -197,21 +201,6 @@ func PrintRelatives(format string, connections []Connection) {
 
 func printConnectionsJSON(connections []Connection) {
 	fmt.Printf("%v", connections)
-}
-
-func adjustLevels(connections []Connection) []Connection {
-	for i, conni := range connections {
-		for _, connj := range connections {
-			// Update the level if parent-child relationship exists.
-			if conni.Name == connj.OwnerName && 
-			   conni.Kind == connj.OwnerKind && 
-			   conni.Namespace == connj.Namespace {
-			   conni.Level = connj.Level + 1
-			   connections[i] = conni
-			}
-		}
-	}
-	return connections
 }
 
 func printConnections(connections []Connection, printtype string) {
@@ -235,9 +224,6 @@ func printConnections(connections []Connection, printtype string) {
 		if pathnum > 0 {
 			path = append(path, connection)
 		}
-		//relativeEntry := "Level:" + levelStr + " kind:" + targetKind + " name:" + relativeName +  " related by:" + relType + " " + ownerDetail
-		//relativeEntry := "Level:" + levelStr + " kind:" + connection.Kind + " name:" + connection.Name + " " + connection.Owner + " " + relType
-		//fmt.Printf(relativeEntry + "\n")
 	}
 	fmt.Printf("------ Branch %d ------\n", pathnum)
 	printPath(path, printtype)
@@ -305,53 +291,65 @@ func compareConnections(c1, c2 Connection) bool {
 		return false
 	} else if c1.Namespace != c2.Namespace {
 		return false
-	} else if c1.Level != c2.Level {
+	} else {
+		return true
+	}
+}
+
+func compareConnectionsRelType(c1, c2 Connection) bool {
+	if c1.Kind != c2.Kind {
+		return false
+	} else if c1.Name != c2.Name {
+		return false
+	} else if c1.Namespace != c2.Namespace {
+		return false
+	} else if c1.RelationType != c2.RelationType {
 		return false
 	} else {
 		return true
 	}
 }
 
-func appendRelNames(relativesNames []string, instanceName string) []string {
+func AppendConnections(allConnections []Connection, connection Connection) []Connection {
 	present := false
-	for _, relName := range relativesNames {
-		if relName == instanceName {
-			present = true
-			break
+	present2 := false
+	//fmt.Printf("----ABC----\n")
+	for i, conn := range allConnections {
+		if connection.Kind == "MysqlCluster" && (*connection.Peer).Kind == "Service" {
+			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
 		}
-	}
-	if !present {
-		relativesNames = append(relativesNames, instanceName)
-	}
-	return relativesNames
-}
+		//present = compareConnectionsRelType(conn, connection) /// working
 
-func appendRelatives(allRelatives, relatives []string) []string {
-	for _, rel := range relatives {
-		present := false 
-		for _, existingRel := range allRelatives {
-			if rel == existingRel {
+		if conn.Kind == connection.Peer.Kind && conn.Name == connection.Peer.Name {
+			if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
+
+			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)
 				present = true
 			}
 		}
-		if !present {
-			allRelatives = append(allRelatives, rel)			
-		}
-	}
-	return allRelatives
-}
-
-func AppendConnections(allConnections []Connection, connection Connection) []Connection {
-	present := false
-	for _, conn := range allConnections {
-		present = compareConnections(conn, connection)
 		if present {
+			if connection.Level < conn.Level {
+				//conn.Level = connection.Level
+				//allConnections[i] = conn
+				// Store the new connection instead of existing connection; Move it at the end
+				allConnectionsNew := append(allConnections[:i], allConnections[i+1:]...)
+				allConnectionsNew = append(allConnectionsNew, connection)
+				allConnections = allConnectionsNew
+			}
 			break
 		}
 	}
 	if !present {
-		allConnections = append(allConnections, connection)
-	}
+		for _, conn := range allConnections {
+			present2 = compareConnectionsRelType(conn, connection)
+			if present2 {
+				break
+			}
+		}
+		if !present2 {
+			allConnections = append(allConnections, connection)
+		}
+	} 
 	return allConnections
 }
 
@@ -378,66 +376,3 @@ func appendConnections1(allConnections, connections []Connection) []Connection {
 	}
 	return allConnections
 }
-
-func collectRelatives(relLeft, relRight []string) []string {
-	relatives := make([]string, 0)
-	for _, rel := range relLeft {
-		relatives = append(relatives, rel)
-	}
-	for _, rel := range relRight {
-		relatives = append(relatives, rel)
-	}
-	return relatives
-}
-
-func filterRelatives(connections []Connection, relativeNames []string) []string {
-	relativesToSearch := make([]string,0)
-	for _, relativeName := range relativeNames {
-		found := false
-		for _, currentRelative := range connections {
-			if currentRelative.Name == relativeName {
-				found = true
-			}
-		}
-		if !found {
-			relativesToSearch = append(relativesToSearch, relativeName)
-		}
-	}
-	return relativesToSearch
-}
-
-func checkHistory(connections []Connection, kind, instance, namespace string) bool {
-	present := false
-	for _, conn := range connections {
-		if conn.Name == instance &&
-		   conn.Kind == kind &&
-		   conn.Namespace == namespace {
-		   	present = true
-		}
-	}
-	return present
-}
-
-func searchOwnerGraph(connections, owners []Connection, level int) []Connection {
-	level = level + 1
-	unseenOwners := make([]Connection,0)
-	for _, owner := range owners {
-		present := false
-		for _, connection := range connections {
-			if connection.Name == owner.Name && connection.Kind == owner.Kind && connection.Namespace == owner.Namespace {
-				present = true
-			}
-		}
-		if !present {
-			unseenOwners = append(unseenOwners, owner)
-		}
-	}
-	for _, relative := range unseenOwners {
-		kind := relative.Kind
-		name := relative.Name
-		namespace := relative.Namespace
-		connections = GetRelatives(connections, level, kind, name, "", "", namespace, "")
-	}
-	return connections
-} 
-
