@@ -401,7 +401,7 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 	//fmt.Printf("----ABC----\n")
 	for i, conn := range allConnections {
 		if connection.Kind == "MysqlCluster" && (*connection.Peer).Kind == "Service" {
-			fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
+			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
 		}
 		//present = compareConnectionsRelType(conn, connection) /// working
 
@@ -415,8 +415,12 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 		}
 		if present {
 			if connection.Level < conn.Level {
-				conn.Level = connection.Level 
-				allConnections[i] = conn
+				//conn.Level = connection.Level
+				//allConnections[i] = conn
+				// Store the new connection instead of existing connection; Move it at the end
+				allConnectionsNew := append(allConnections[:i], allConnections[i+1:]...)
+				allConnectionsNew = append(allConnectionsNew, connection)
+				allConnections = allConnectionsNew
 			}
 			break
 		}

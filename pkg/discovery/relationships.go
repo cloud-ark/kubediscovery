@@ -4,6 +4,7 @@ import (
 	"strings"
 	"fmt"
 	"context"
+	"os"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -19,29 +20,31 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 	}
 	exists := checkExistence(kind, instance, namespace)
 	//fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s\n", level, kind, instance, origkind, originstance)
-	fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)	
-	if kind != origkind && instance != originstance {
-		node := Connection{
-			Level: level,
-			Kind: kind,
-			Name: instance,
-			Namespace: namespace,
-			RelationType: relType,
-			Peer: &Connection{
-				Kind: origkind,
-				Name: originstance,
-				Namespace: namespace,
-			},
-		}
-		TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
-	}
-
 	if exists {
+
+		fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)	
+		if kind != origkind && instance != originstance {
+			node := Connection{
+				Level: level,
+				Kind: kind,
+				Name: instance,
+				Namespace: namespace,
+				RelationType: relType,
+				Peer: &Connection{
+					Kind: origkind,
+					Name: originstance,
+					Namespace: namespace,
+				},
+			}
+			TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
+		}
+
 		relatedKindList := findRelatedKinds(kind)
 		//fmt.Printf("Kind:%s, Related Kind List 1:%v\n", kind, relatedKindList)
 		connections = findRelatives(connections, level, kind, instance, origkind, originstance, namespace, relatedKindList, relType)
 	} else {
 		fmt.Printf("Resource %s of kind %s in namespace %s does not exist.\n", instance, kind, namespace)
+		os.Exit(1)
 	}
 	return connections
 }
@@ -428,7 +431,6 @@ func findParentConnections(connections []Connection, level int, kind, instance, 
 				Kind: kind,
 				Name: instance,
 				Namespace: namespace,
-				//Level: level + 1,
 				RelationType: relTypeOwnerReference,
 	}
 	if ownerKind != "" && ownerInstance != "" {
@@ -468,7 +470,6 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 				Kind: kind,
 				Name: instance,
 				Namespace: namespace,
-				Level: level + 1,
 				RelationType: relTypeOwnerReference,
 	}
 	for _, relKind := range relatedKindList {
@@ -494,7 +495,7 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 					Kind: relKind,
 					Namespace: namespace,
 					RelationType: relTypeOwnerReference,
-					//Level: level + 1,
+					Level: level + 1,
 					Peer: &peer,
 				}
 				childs = append(childs, connection)
@@ -503,8 +504,8 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 	}
 	//fmt.Printf("Connections:%v\n", connections)
 	//fmt.Printf("Childs:%v\n", childs)
-	//childrenToSearch := filterConnections(connections, childs)
-	childrenToSearch := childs
+	childrenToSearch := filterConnections(connections, childs)
+	//childrenToSearch := childs
 	//fmt.Printf("ChildrenToSearch:%v\n", childrenToSearch)
 	if len(childrenToSearch) > 0 {
 		for _, conn := range childrenToSearch {
