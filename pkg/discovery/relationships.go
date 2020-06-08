@@ -441,7 +441,7 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 		if err != nil {
 			children, err = dynamicClient.Resource(childRes).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				panic(err)
+				return connections
 			}
 		}
 		for _, child := range children.Items {
@@ -539,7 +539,8 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 	//fmt.Printf("%v\n", lhsRes)
 	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		return relativesNames, relDetail
+		//panic(err)
 	}
 
 	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
@@ -548,7 +549,8 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 									   Resource: rhsResKindPlural}
 	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		return relativesNames, relDetail
+		//panic(err)
 	}
 
 	for _, instanceObj := range lhsInstList {
@@ -624,12 +626,13 @@ func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, ta
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
 	if err != nil {
-		panic(err)
+		//panic(err)
 		return relativesNames, propertyNameValue
 	}
 	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		//panic(err)
+		return relativesNames, propertyNameValue
 	}
 
 	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
@@ -638,7 +641,8 @@ func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, ta
 									   Resource: rhsResKindPlural}
 	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		//panic(err)
+		return relativesNames, propertyNameValue
 	}
 
 	for _, instanceObj := range lhsInstList {
@@ -755,7 +759,8 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetIns
 									   Resource: lhsResKindPlural}
 	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		return relativesNames, envNameValue
+		//panic(err)
 	}
 
 	rhsResKindPlural, _, rhsResApiVersion, rhsResGroup := getKindAPIDetails(targetKind)
@@ -764,7 +769,8 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetIns
 									   Resource: rhsResKindPlural}
 	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
-		panic(err)
+		return relativesNames, envNameValue
+		//panic(err)
 	}
 
 	//fmt.Printf("LHSList:%v\n", lhsInstList)
@@ -840,7 +846,8 @@ func getObjects(instance, namespace string, res schema.GroupVersionResource, dyn
 		if err != nil { // Check if this is a non-namespaced resource
 			lhsInstances, err = dynamicClient.Resource(res).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
-				panic(err)
+				//panic(err)
+				return lhsInstList, err
 			}
 		}
 		for _, lhsObj := range lhsInstances.Items {
@@ -855,7 +862,8 @@ func getObjects(instance, namespace string, res schema.GroupVersionResource, dyn
 		if err != nil { // Check if this is a non-namespaced resource
 			lhsObj, err = dynamicClient.Resource(res).Get(context.TODO(), instance, metav1.GetOptions{})
 			if err != nil {
-				panic(err)
+				//panic(err)
+				return lhsInstList, err
 			}
 		}
 		lhsInstList = append(lhsInstList, lhsObj)
