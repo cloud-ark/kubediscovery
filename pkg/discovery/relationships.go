@@ -461,8 +461,8 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 	}
 	//fmt.Printf("Connections:%v\n", connections)
 	//fmt.Printf("Childs:%v\n", childs)
-	childrenToSearch := filterConnections(connections, childs)
-	//childrenToSearch := childs
+	//childrenToSearch := filterConnections(connections, childs)
+	childrenToSearch := childs
 	//fmt.Printf("ChildrenToSearch:%v\n", childrenToSearch)
 	if len(childrenToSearch) > 0 {
 		for _, conn := range childrenToSearch {

@@ -328,7 +328,7 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 			}
 		}
 		if present {
-			if connection.Level < conn.Level {
+			if connection.Level < conn.Level && connection.Level == 1 {
 				//conn.Level = connection.Level
 				//allConnections[i] = conn
 				// Store the new connection instead of existing connection; Move it at the end
