@@ -38,7 +38,6 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 			}
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
 		}
-
 		relatedKindList := findRelatedKinds(kind)
 		//fmt.Printf("Kind:%s, Related Kind List 1:%v\n", kind, relatedKindList)
 		connections = findRelatives(connections, level, kind, instance, origkind, originstance, namespace, relatedKindList, relType)
@@ -204,6 +203,12 @@ func findUpstreamRelatives(connections []Connection, level int, kind, targetInst
 func buildGraph(connections []Connection, level int, kind, instance string, relativesNames []Connection, targetKind, namespace, relType, relDetail string) ([]Connection) {
 	currentConnections := prepare(level, kind, instance, connections, relativesNames, targetKind, namespace, relType, relDetail)
 	unseenRelatives := filterConnections(connections, relativesNames)
+
+	if len(unseenRelatives) == 0 {
+		for _, conn := range currentConnections {
+			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
+		}
+	}
 	//fmt.Printf("UnseenRelatives:%v\n", unseenRelatives)
 	connections = appendCurrentLevelPeers(connections, currentConnections, level)
 	nextLevelConnections := searchNextLevel(connections, level, unseenRelatives, kind, instance, targetKind, namespace, relType)
@@ -364,7 +369,6 @@ func findCompositionConnections(connections []Connection, level int, kind, insta
 						Kind: kind,
 						Name: instance,
 						Namespace: namespace, // should be same as childNamespace
-						Level: level + 1,
 					},
 					Level: level + 1,
 				}
@@ -461,8 +465,8 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 	}
 	//fmt.Printf("Connections:%v\n", connections)
 	//fmt.Printf("Childs:%v\n", childs)
-	//childrenToSearch := filterConnections(connections, childs)
-	childrenToSearch := childs
+	childrenToSearch := filterConnections(connections, childs)
+	//childrenToSearch := childs
 	//fmt.Printf("ChildrenToSearch:%v\n", childrenToSearch)
 	if len(childrenToSearch) > 0 {
 		for _, conn := range childrenToSearch {
@@ -475,6 +479,7 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 		//fmt.Printf("Child:%v\n", childs)
 		//fmt.Printf("TotalClusterConnections:%v\n", TotalClusterConnections)
 		for _, conn := range childs {
+			conn.Level = level
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
 		}
 		//fmt.Printf("TotalClusterConnections1:%v\n", TotalClusterConnections)
