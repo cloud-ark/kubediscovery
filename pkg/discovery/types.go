@@ -161,8 +161,8 @@ func init() {
 	relationshipMap[DEPLOYMENT] = deploymentRelationships
 
 	KindPluralMap[REPLICA_SET] = "replicasets"
-	kindVersionMap[REPLICA_SET] = "apis/extensions/v1beta1"
-	kindGroupMap[REPLICA_SET] = "extensions"
+	kindVersionMap[REPLICA_SET] = "apis/apps/v1"
+	kindGroupMap[REPLICA_SET] = "apps"
 	compositionMap[REPLICA_SET] = []string{"Pod"}
 	replicasetRelationships := make([]string,0)
 	replicasetRel := "owner reference, of:Pod, value:INSTANCE.name"
@@ -170,12 +170,7 @@ func init() {
 	relationshipMap[REPLICA_SET] = replicasetRelationships
 
 	KindPluralMap[DAEMONSET] = "daemonsets"
-	kindVersionMap[DAEMONSET] = "apis/extensions/v1beta1"
-	kindGroupMap[DAEMONSET] = "extensions"
-	compositionMap[DAEMONSET] = []string{"Pod"}
-
-	KindPluralMap[DAEMONSET] = "daemonsets"
-	kindVersionMap[DAEMONSET] = "apis/apps/v1" //Bug: This will overwrite assignment in 104.
+	kindVersionMap[DAEMONSET] = "apis/apps/v1"
 	kindGroupMap[DAEMONSET] = "apps"
 	compositionMap[DAEMONSET] = []string{"Pod"}
 
@@ -209,7 +204,7 @@ func init() {
 	relationshipMap[SERVICE] = serviceRelationships
 
 	KindPluralMap[INGRESS] = "ingresses"
-	kindVersionMap[INGRESS] = "extensions/v1beta1"
+	kindVersionMap[INGRESS] = "networking.k8s.io/v1beta1"//"extensions/v1beta1"
 	kindGroupMap[INGRESS] = "networking.k8s.io"
 	compositionMap[INGRESS] = []string{}
 	ingressRelationships := make([]string,0)
@@ -232,10 +227,12 @@ func init() {
 	kindGroupMap[PV] = ""
 	compositionMap[PV] = []string{}
 
+/*
 	KindPluralMap[INGRESS] = "ingresses"
 	kindVersionMap[INGRESS] = "apis/extensions/v1beta1"
 	kindGroupMap[INGRESS] = "extensions"
 	compositionMap[INGRESS] = []string{}
+*/
 
 	KindPluralMap[STATEFULSET] = "statefulsets"
 	kindVersionMap[STATEFULSET] = "apis/apps/v1"
