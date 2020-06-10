@@ -112,13 +112,18 @@ func findRelatives(connections []Connection, level int, kind, instance, origkind
 		Kind: kind,
 		Namespace: namespace,
 		RelationType: relType,
-		Peer: &Connection{
+		Level: level, 
+	}
+
+	if kind != origkind && instance != originstance {
+		peer := Connection{
 			Name: originstance,
 			Kind: origkind,
 			Namespace: namespace,
-		},
-		Level: level, 
+		}
+		inputInstance.Peer = &peer
 	}
+
 	relativesNames := make([]Connection,0)
 	relativesNames = append(relativesNames, inputInstance)
 
@@ -204,6 +209,10 @@ func buildGraph(connections []Connection, level int, kind, instance string, rela
 	currentConnections := prepare(level, kind, instance, connections, relativesNames, targetKind, namespace, relType, relDetail)
 	unseenRelatives := filterConnections(connections, relativesNames)
 
+	//fmt.Printf("Connections:%v\n", connections)
+	//fmt.Printf("CurrentConns:%v\n", currentConnections)
+	//fmt.Printf("UnseenRels:%v\n", unseenRelatives)
+
 	if len(unseenRelatives) == 0 {
 		for _, conn := range currentConnections {
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
@@ -222,10 +231,12 @@ func setPeers(connections []Connection, kind, instance, origkind, originstance, 
 	for _, conn := range connections {
 		if conn.Name == instance && conn.Kind == kind {
 			if conn.Peer == nil {
-				conn.Peer = &Connection{
-				Kind: origkind,
-				Name: originstance,
-				Namespace: namespace,
+				if kind != origkind && instance != originstance {
+						conn.Peer = &Connection{
+						Kind: origkind,
+						Name: originstance,
+						Namespace: namespace,
+					}
 			   }
 			} 
 		}
@@ -396,14 +407,23 @@ func findParentConnections(connections []Connection, level int, kind, instance, 
 				Namespace: namespace,
 				RelationType: relTypeOwnerReference,
 	}
+	//fmt.Printf("Kind:%s Instance:%s OwnerKind:%s OwnerInstance:%s\n", kind, instance, ownerKind, ownerInstance)
 	if ownerKind != "" && ownerInstance != "" {
 		ownerConn := Connection{
 			Name: ownerInstance,
 			Kind: ownerKind,
 			Namespace: namespace,
 			RelationType: relTypeOwnerReference,
-			Peer: &peer,
-			Level: level + 1,
+			Level: level,
+		}
+		if ownerKind != kind && ownerInstance != instance {
+			ownerConn.Peer = &peer
+		} else {
+			ownerConn.Peer = &Connection{
+				Name: "",
+				Kind: "",
+				Namespace: "",
+			}
 		}
 		owners := make([]Connection,0)
 		owners = append(owners, ownerConn)
@@ -518,13 +538,13 @@ func getOwnerDetail(kind, instance, namespace string) (string, string) {
 									   		Resource: ownerResKindPlural}
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		return kind, instance
+		return ownerKind, ownerInstance
 	}
 	instanceObj, err := dynamicClient.Resource(ownerRes).Namespace(namespace).Get(context.TODO(),
 																			 	  instance,
 																	   		 	  metav1.GetOptions{})
 	if err != nil {
-		return kind, instance
+		return ownerKind, ownerInstance
 	}
 	ownerKind, ownerInstance = findOwner(*instanceObj)
 	return ownerKind, ownerInstance
