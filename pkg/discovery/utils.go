@@ -315,7 +315,7 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 	present2 := false
 	//fmt.Printf("----ABC----\n")
 	for i, conn := range allConnections {
-		//if connection.Kind == "MysqlCluster" && (*connection.Peer).Kind == "Service" {
+		//if connection.Kind == "ClusterIssuer" && (*connection.Peer).Kind == "ClusterIssuer" {
 			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
 		//}
 		//present = compareConnectionsRelType(conn, connection) /// working
