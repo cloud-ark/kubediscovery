@@ -109,6 +109,10 @@ var (
 	relTypeOwnerReference string
 
 	green, red, yellow, purple, cyan, reset string
+
+	// Set to inputs given to connections
+	OrigKind, OrigName, OrigNamespace string
+	OrigLevel int
 )
 
 func init() {
@@ -190,8 +194,10 @@ func init() {
 	compositionMap[POD] = []string{}
 
 	podRelationships := make([]string,0)
-	podRel := "specproperty, on:INSTANCE.spec.env, value:Service.spec.metadata.name"
-	podRelationships = append(podRelationships, podRel)
+	podRel0 := "specproperty, on:INSTANCE.spec.env, value:Service.spec.metadata.name"
+	podRel1 := "specproperty, on:INSTANCE.spec.volumes.persistentVolumeClaim.claimName, value:PersistentVolumeClaim.spec.metadata.name"
+	podRelationships = append(podRelationships, podRel0)
+	podRelationships = append(podRelationships, podRel1)
 	relationshipMap[POD] = podRelationships
 
 	KindPluralMap[SERVICE] = "services"

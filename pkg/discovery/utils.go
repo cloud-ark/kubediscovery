@@ -305,6 +305,8 @@ func compareConnectionsRelType(c1, c2 Connection) bool {
 		return false
 	} else if c1.RelationType != c2.RelationType {
 		return false
+	} else if c1.Peer.Name != c2.Peer.Name {
+		return false
 	} else {
 		return true
 	}
@@ -313,6 +315,7 @@ func compareConnectionsRelType(c1, c2 Connection) bool {
 func AppendConnections(allConnections []Connection, connection Connection) []Connection {
 	present := false
 	present2 := false
+	//present3 := false
 	//fmt.Printf("----ABC----\n")
 	for i, conn := range allConnections {
 		//if connection.Kind == "ClusterIssuer" && (*connection.Peer).Kind == "ClusterIssuer" {
@@ -320,6 +323,8 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 		//}
 		//present = compareConnectionsRelType(conn, connection) /// working
 
+		// Case 1: Check if connection exists without any concern with the edge type.
+		// If so, store the connection as new entry towards the end; remove the current entry.
 		if conn.Kind == connection.Peer.Kind && conn.Name == connection.Peer.Name {
 			if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
 
@@ -337,7 +342,17 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 			break
 		}
 	}
+
+	// Case 3: Check if connection is not same as the original input
+	/*originalInput := Connection{
+		Kind: OrigKind,
+		Name: OrigName,
+		Namespace: OrigNamespace,
+	}
+	present = compareConnections(connection, originalInput)*/
+
 	if !present {
+		// Case 2: Check if connection has not been discovered before 
 		for _, conn := range allConnections {
 			present2 = compareConnectionsRelType(conn, connection)
 			if present2 {
@@ -345,7 +360,7 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 			}
 		}
 		if !present2 {
-			allConnections = append(allConnections, connection)
+			allConnections = append(allConnections, connection)	
 		}
 	} 
 	return allConnections
