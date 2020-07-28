@@ -17,6 +17,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
+	"net/http"
 )
 
 const GroupName = "platform-as-code"
@@ -123,7 +124,7 @@ func (c completedConfig) New() (*DiscoveryServer, error) {
 		return nil, err
 	}
 
-	installKubePlusPaths(s)
+	//installKubePlusPaths(s)
 
 	return s, nil
 }
@@ -144,8 +145,9 @@ func handleResourceDetailsEndpoint(request *restful.Request, response *restful.R
 	response.Write([]byte(resourceInfo))
 }
 
-func installKubePlusPaths(discoveryServer *DiscoveryServer) {
+func InstallKubePlusPaths() {//discoveryServer *DiscoveryServer) {
 
+	fmt.Printf("Inside InstallKubePlusPaths...")
 	path := "/apis/" + GroupName + "/" + GroupVersion
 
 	ws1 := getWebService()
@@ -153,14 +155,23 @@ func installKubePlusPaths(discoveryServer *DiscoveryServer) {
 		Consumes(restful.MIME_JSON, restful.MIME_XML).
 		Produces(restful.MIME_JSON, restful.MIME_XML)
 
+	ws1.Route(ws1.GET("/helloworld").To(handleHelloWorld))
 	ws1.Route(ws1.GET("/explain").To(handleExplainEndpoint))
 	ws1.Route(ws1.GET("/composition").To(handleCompositionEndpoint))
 	//ws1.Route(ws1.GET("/implementation_details").To(handleImplementationDetailsEndpoint))
 	//ws1.Route(ws1.GET("/usage").To(handleUsageEndpoint))
 	ws1.Route(ws1.GET("/man").To(handleManPageEndpoint))
 	ws1.Route(ws1.GET("/resourceDetails").To(handleResourceDetailsEndpoint))
+	restful.Add(ws1)
+	http.ListenAndServe(":8080", nil)
+	fmt.Printf("Done installing KubePlus paths...")
 
-	discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+	//discoveryServer.GenericAPIServer.Handler.GoRestfulContainer.Add(ws1)
+}
+
+func handleHelloWorld(request *restful.Request, response *restful.Response) {
+	queryResponse := "Hello world!"
+	response.Write([]byte(queryResponse))
 }
 
 func handleExplainEndpoint(request *restful.Request, response *restful.Response) {

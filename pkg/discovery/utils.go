@@ -212,6 +212,7 @@ func printConnections(connections []Connection, printtype string) {
 	//fmt.Printf("Output Connections: %v\n", connections)
 	fmt.Printf("\n::Final connections graph::\n")
 	for _, connection := range connections {
+		//printNode(connection, "flat", "")
 		if connection.Level == 1 {
 			if pathnum > 0 {
 				fmt.Printf("------ Branch %d ------\n", pathnum)
@@ -316,7 +317,7 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 	present := false
 	present2 := false
 	//present3 := false
-	//fmt.Printf("----ABC----\n")
+	//fmt.Printf("connection.Name:%s, connection.Kind:%s\n", connection.Name, connection.Kind)
 	for i, conn := range allConnections {
 		//if connection.Kind == "ClusterIssuer" && (*connection.Peer).Kind == "ClusterIssuer" {
 			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
@@ -325,11 +326,16 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 
 		// Case 1: Check if connection exists without any concern with the edge type.
 		// If so, store the connection as new entry towards the end; remove the current entry.
-		if conn.Kind == connection.Peer.Kind && conn.Name == connection.Peer.Name {
-			if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
-
+		if connection.Peer != nil {
+			//fmt.Printf("conn.Kind:%s,", conn.Kind)
+			//fmt.Printf("conn.Name:%s", conn.Name)
+			//fmt.Printf("connection.Peer.Name:%s", connection.Peer.Name)
+			//fmt.Printf("connection.Peer.Kind:%s,", connection.Peer.Kind)
+			if conn.Kind == connection.Peer.Kind && conn.Name == connection.Peer.Name {
+				if (*conn.Peer).Kind == connection.Kind && (*conn.Peer).Name == connection.Name {
 			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)
-				present = true
+					present = true
+				}
 			}
 		}
 		if present {

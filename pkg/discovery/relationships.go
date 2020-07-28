@@ -23,7 +23,7 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 	if exists {
 	//fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s\n", level, kind, instance, origkind, originstance)
 		fmt.Printf("Discovering connections - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
-		if kind == OrigKind && instance == OrigName && namespace == OrigNamespace && level != OrigLevel {
+		/*if kind == OrigKind && instance == OrigName && namespace == OrigNamespace && level != OrigLevel {
 			node := Connection{
 				Level: level,
 				Kind: kind,
@@ -36,24 +36,34 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 					Namespace: namespace,
 				},
 			}
+			//fmt.Printf("6\n")
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
 			return connections
-		}
+		}*/
+
+		var peer Connection
 		if kind != origkind && instance != originstance {
-			node := Connection{
-				Level: level,
-				Kind: kind,
-				Name: instance,
-				Namespace: namespace,
-				RelationType: relType,
-				Peer: &Connection{
-					Kind: origkind,
-					Name: originstance,
-					Namespace: namespace,
-				},
-			}
-			TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
+				peer = Connection{
+						Kind: origkind,
+						Name: originstance,
+						Namespace: namespace,
+						} 
+		} else {
+				peer = Connection{
+						Kind: origkind,
+						Name: originstance,
+						Namespace: namespace,
+						}
 		}
+		node := Connection{
+			Level: level,
+			Kind: kind,
+			Name: instance,
+			Namespace: namespace,
+			RelationType: relType,
+			Peer: &peer,
+		}
+		TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
 		relatedKindList := findRelatedKinds(kind)
 		//fmt.Printf("Kind:%s, Related Kind List 1:%v\n", kind, relatedKindList)
 		connections = findRelatives(connections, level, kind, instance, origkind, originstance, namespace, relatedKindList, relType)
@@ -87,6 +97,25 @@ func checkExistence(kind, instance, namespace string) bool {
 			return false
 		}
 	}
+
+	// Add label
+	/*objCopy := obj.DeepCopy()
+	labelMap := make(map[string]string)
+	labelMap = obj.GetLabels()
+	labelMap["def"] = "def"
+	objCopy.SetLabels(labelMap)
+
+	fmt.Printf("Before adding label.\n")
+	_, err = dynamicClient.Resource(res).Namespace(namespace).Update(context.TODO(),
+																	 objCopy,
+																	 metav1.UpdateOptions{})
+	fmt.Printf("Done adding label.\n")
+
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		return false
+	}*/
+
 	return true
 }
 
@@ -129,6 +158,11 @@ func findRelatives(connections []Connection, level int, kind, instance, origkind
 		Namespace: namespace,
 		RelationType: relType,
 		Level: level, 
+		Peer: &Connection{
+			Name: "",
+			Kind: "",
+			Namespace: "",
+		},
 	}
 
 	if kind != origkind && instance != originstance {
@@ -145,7 +179,7 @@ func findRelatives(connections []Connection, level int, kind, instance, origkind
 
 	unseenRelatives := filterConnections(connections, relativesNames)
 	if len(unseenRelatives) == 0 {
-		TotalClusterConnections = AppendConnections(TotalClusterConnections, inputInstance)
+		//TotalClusterConnections = AppendConnections(TotalClusterConnections, inputInstance)
 	}
 
 	currentConnections := prepare(level, kind, instance, connections, unseenRelatives, kind, namespace, relType, "")
@@ -257,9 +291,10 @@ func buildGraph(connections []Connection, level int, kind, instance string, rela
 	//fmt.Printf("UnseenRels:%v\n", unseenRelatives)
 
 	if len(unseenRelatives) == 0 {
-		for _, conn := range currentConnections {
+		/*for _, conn := range currentConnections {
+			//fmt.Printf("3\n")
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
-		}
+		}*/
 	}
 	//fmt.Printf("UnseenRelatives:%v\n", unseenRelatives)
 	connections = appendCurrentLevelPeers(connections, currentConnections, level)
@@ -385,22 +420,34 @@ func prepare(level int, kind, instance string, connections, relativeNames []Conn
 			OwnerName: ownerInstance,
 			RelationType: relType,
 			RelationDetails: relDetail,
+			Peer: &Connection{
+				Name: instance, 
+				Kind: kind,
+				Namespace: namespace,
+				Level: level + 1,
+				},
 		}
-		if kind != targetKind && instance != relativeName {
+		/*if kind != targetKind && instance != relativeName {
 			connection.Peer = &Connection{
 				Name: instance, 
 				Kind: kind,
 				Namespace: namespace,
 				Level: level + 1,
 			}
-		}
+		} else {
+			connection.Peer = &Connection{
+				Name: "",
+				Kind: "",
+				Namespace: "",
+				RelationType: "",
+			}
+		}*/
 		preparedConnections = append(preparedConnections, connection)
 	}
 	return preparedConnections
 }
 
 func findCompositionConnections(connections []Connection, level int, kind, instance, namespace string) []Connection {
-	
 	if _, ok := crdcompositionMap[kind]; ok {
 
 	composition := TotalClusterCompositions.GetCompositions(kind, instance, namespace)
@@ -435,6 +482,7 @@ func findCompositionConnections(connections []Connection, level int, kind, insta
 	childrenToSearch := childrenConnections
 	for _, conn := range childrenToSearch {
 		relType := relTypeOwnerReference
+		//fmt.Printf("Conn.Kind:%s Conn.Name:%s kind:%s instance:%s\n", conn.Kind, conn.Name, kind, instance)
 		connections = GetRelatives(connections, level, conn.Kind, conn.Name, kind, instance, namespace, relType)
 	}
 	}
@@ -479,9 +527,10 @@ func findParentConnections(connections []Connection, level int, kind, instance, 
 				connections = GetRelatives(connections, level, conn.Kind, conn.Name, kind, instance, namespace, relType)
 			}
 		} else {
-			for _, conn := range owners {
+			/*for _, conn := range owners {
+				//fmt.Printf("4\n")
 				TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
-			}
+			}*/
 		}
 	}
 	return connections
@@ -543,7 +592,8 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 		//fmt.Printf("TotalClusterConnections:%v\n", TotalClusterConnections)
 		for _, conn := range childs {
 			conn.Level = level
-			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
+			//fmt.Printf("5\n")
+			//TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
 		}
 		//fmt.Printf("TotalClusterConnections1:%v\n", TotalClusterConnections)
 	}
