@@ -40,6 +40,7 @@ func GetRelatives(connections [] Connection, level int, kind, instance, origkind
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, node)
 			return connections
 		}*/
+
 		var peer Connection
 		if kind != origkind && instance != originstance {
 				peer = Connection{

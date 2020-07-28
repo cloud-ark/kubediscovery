@@ -317,7 +317,6 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 	present := false
 	present2 := false
 	//present3 := false
-	//fmt.Printf("----ABC----\n")
 	//fmt.Printf("connection.Name:%s, connection.Kind:%s\n", connection.Name, connection.Kind)
 	for i, conn := range allConnections {
 		//if connection.Kind == "ClusterIssuer" && (*connection.Peer).Kind == "ClusterIssuer" {
