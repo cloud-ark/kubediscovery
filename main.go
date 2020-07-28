@@ -1,11 +1,12 @@
 package main
 
 import (
-	"flag"
+//	"flag"
 	"os"
 	"fmt"
-	genericapiserver "k8s.io/apiserver/pkg/server"
-	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
+	"time"
+//	genericapiserver "k8s.io/apiserver/pkg/server"
+//	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 	"github.com/cloud-ark/kubediscovery/pkg/apiserver"
 )
@@ -43,7 +44,7 @@ func main() {
 			discovery.OrigNamespace = namespace
 			discovery.OrigLevel = level
 			discovery.BuildCompositionTree(namespace)
-			root := discovery.Connection{
+			/*root := discovery.Connection{
 				Name: instance,
 				Kind: kind,
 				Namespace: namespace,
@@ -53,8 +54,8 @@ func main() {
 					Kind: "",
 					Namespace: "",
 				},
-			}
-			discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
+			}*/
+			//discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
 			
 			connections = discovery.GetRelatives(connections, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
 												 namespace, relationType)
@@ -73,12 +74,19 @@ func main() {
 		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")
-		stopCh := genericapiserver.SetupSignalHandler()
+		fmt.Printf("Installing KubePlus paths.\n")
+		go apiserver.InstallKubePlusPaths()
+		fmt.Printf("After installing KubePlus paths.\n")
+		// Run forever
+		for {
+			time.Sleep(60*time.Second)
+		}
+		/*stopCh := genericapiserver.SetupSignalHandler()
 		options := server.NewDiscoveryServerOptions(os.Stdout, os.Stderr)
 		cmd := server.NewCommandStartDiscoveryServer(options, stopCh)
 		cmd.Flags().AddGoFlagSet(flag.CommandLine)
 		if err := cmd.Execute(); err != nil {
 			panic(err)
-		}
+		}*/
 	}
 }
