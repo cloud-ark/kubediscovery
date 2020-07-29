@@ -199,7 +199,7 @@ func findRelatives(connections []Connection, level int, kind, instance, origkind
 	connections = findParentConnections(connections, level, kind, instance, namespace)
 	connections = findChildrenConnections(connections, level, kind, instance, namespace)
 	connections = findCompositionConnections(connections, level, kind, instance, namespace)
-	connections = setPeers(connections, kind, instance, origkind, originstance, namespace, level)
+	//connections = setPeers(connections, kind, instance, origkind, originstance, namespace, level)
 	return connections
 }
 
@@ -209,7 +209,7 @@ func getImmediateUpstreamRelative(relStringList []string, kind, instance, target
 		relType, lhs, rhs, _ := parseRelationship(relString)
 		if relType == relTypeLabel {
 			selectorLabelMap := getSelectorLabels(kind, instance, namespace)
-			relativesNames, _ = searchLabels(instance, selectorLabelMap, targetKind, namespace)
+			relativesNames, _ = searchLabels(kind, instance, selectorLabelMap, targetKind, namespace)
 					//fmt.Printf("FDSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 		}
 		if relType == relTypeSpecProperty {
@@ -232,7 +232,7 @@ func findDownstreamRelatives(connections []Connection, level int, kind, instance
 		for _, targetKind := range targetKindList {
 			if relType == relTypeLabel {
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
-				relativesNames, relDetail := searchLabels(instance, selectorLabelMap, targetKind, namespace)
+				relativesNames, relDetail := searchLabels(kind, instance, selectorLabelMap, targetKind, namespace)
 				//fmt.Printf("FDSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 				connections = buildGraph(connections, level, kind, instance, relativesNames, targetKind, namespace, relType, relDetail)
 			}
@@ -260,7 +260,7 @@ func findUpstreamRelatives(connections []Connection, level int, kind, targetInst
 		for _, targetKind := range targetKindList {
 			if relType == relTypeLabel {
 				labelMap := getLabels(targetKind, targetInstance, namespace)
-				relativesNames, relDetail := searchSelectors(labelMap, kind, namespace)
+				relativesNames, relDetail := searchSelectors(targetKind, targetInstance, labelMap, kind, namespace)
 				//fmt.Printf("FUSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 				connections = buildGraph(connections, level, targetKind, targetInstance, relativesNames, kind, namespace, relType, relDetail)
 			}
@@ -291,10 +291,10 @@ func buildGraph(connections []Connection, level int, kind, instance string, rela
 	//fmt.Printf("UnseenRels:%v\n", unseenRelatives)
 
 	if len(unseenRelatives) == 0 {
-		/*for _, conn := range currentConnections {
+		for _, conn := range currentConnections {
 			//fmt.Printf("3\n")
 			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
-		}*/
+		}
 	}
 	//fmt.Printf("UnseenRelatives:%v\n", unseenRelatives)
 	connections = appendCurrentLevelPeers(connections, currentConnections, level)
@@ -593,7 +593,7 @@ func findChildrenConnections(connections []Connection, level int, kind, instance
 		for _, conn := range childs {
 			conn.Level = level
 			//fmt.Printf("5\n")
-			//TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
+			TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
 		}
 		//fmt.Printf("TotalClusterConnections1:%v\n", TotalClusterConnections)
 	}
@@ -696,6 +696,11 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 							Namespace: namespace,
 							RelationDetails: relDetail,
 							RelationType: relTypeAnnotation,
+							Peer: &Connection{
+								Name: targetInstance,
+								Kind: targetKind,
+								Namespace: namespace,
+							},
 						}
 						relativesNames = append(relativesNames, conn)
 					}
@@ -713,6 +718,11 @@ func searchAnnotations(kind, instance, namespace, annotationKey, annotationValue
 							Namespace: namespace,
 							RelationDetails: relDetail,
 							RelationType: relTypeAnnotation,
+							Peer: &Connection{
+								Name: instance,
+								Kind: kind,
+								Namespace: namespace,
+							},
 						}
 						relativesNames = append(relativesNames, conn)
 					}
@@ -800,6 +810,11 @@ func searchSpecPropertyField(kind, instance, namespace, lhs, rhs, targetKind, ta
 							Namespace: namespace,
 							RelationDetails: propertyNameValue,
 							RelationType: relTypeSpecProperty,
+							Peer: &Connection{
+								Name: instance,
+								Kind: kind,
+								Namespace: namespace,
+							},
 						}
 						relativesNames = append(relativesNames, conn)
 						if found {
@@ -943,6 +958,11 @@ func searchSpecPropertyEnv(kind, instance, namespace, rhs, targetKind, targetIns
 										Namespace: namespace,
 										RelationDetails: envNameValue,
 										RelationType: relTypeEnvvariable,
+										Peer: &Connection{
+											Name: instance,
+											Kind: kind,
+											Namespace: namespace,
+										},
 									}
 									connList := make([]Connection,0)
 									connList = append(connList,conn)
@@ -1081,7 +1101,7 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 	return selectorMap
 }
 
-func searchSelectors(labelMap map[string]string, targetKind, namespace string) ([]Connection, string) {
+func searchSelectors(sourceKind, sourceInstance string, labelMap map[string]string, targetKind, namespace string) ([]Connection, string) {
 	instanceNames := make([]Connection, 0)
 	relDetail := ""
 	dynamicClient, err := getDynamicClient()
@@ -1119,6 +1139,11 @@ func searchSelectors(labelMap map[string]string, targetKind, namespace string) (
 				Namespace: namespace,
 				RelationDetails: relDetail,
 				RelationType: relTypeLabel,
+				Peer: &Connection{
+					Name: sourceInstance,
+					Kind: sourceKind,
+					Namespace: namespace,
+				},
 			}
 			instanceNames = append(instanceNames, instanceName)
 		}
@@ -1138,7 +1163,7 @@ func searchNameInLabels(name string, label map[string]string) bool {
 	return false
 }
 
-func searchLabels(sourceInstance string, labelMap map[string]string, targetKind, namespace string) ([]Connection, string) {
+func searchLabels(sourceKind, sourceInstance string, labelMap map[string]string, targetKind, namespace string) ([]Connection, string) {
 	instanceNames := make([]Connection, 0)
 	relDetail := ""
 	dynamicClient, err := getDynamicClient()
@@ -1172,6 +1197,11 @@ func searchLabels(sourceInstance string, labelMap map[string]string, targetKind,
 				Namespace: namespace,
 				RelationDetails: relDetail,
 				RelationType: relTypeLabel,
+				Peer: &Connection{
+					Name: sourceInstance,
+					Kind: sourceKind,
+					Namespace: namespace,
+				},
 			}
 			instanceNames = append(instanceNames, instanceName)
 		}
