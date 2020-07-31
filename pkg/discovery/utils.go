@@ -13,6 +13,8 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 var (
@@ -185,6 +187,75 @@ func printMaps() {
 }
 
 // Connection utility functions
+func checkExistence(kind, instance, namespace string) bool {
+	if instance == "" {
+		return false
+	}
+	dynamicClient, err := getDynamicClient()
+	if err != nil {
+		fmt.Printf("Error: %s\n", err.Error())
+		return false
+	}
+	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
+	res := schema.GroupVersionResource{Group: resourceGroup,
+									   Version: resourceApiVersion,
+									   Resource: resourceKindPlural}
+	_, err = dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(),
+																			 instance,
+																	   		 metav1.GetOptions{})
+	if err != nil {
+		_, err1 := dynamicClient.Resource(res).Get(context.TODO(),instance,metav1.GetOptions{})
+		if err1 != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func findRelatedKinds(kind string) []string{
+	relatedKinds := make([]string, 0)
+	for key, relStringList := range relationshipMap {
+		for _, relString := range relStringList {
+			_, _, _, targetKindList := parseRelationship(relString)
+			for _, targetKind := range targetKindList {
+				if targetKind == kind {
+					relatedKinds = append(relatedKinds, key)
+				}
+			}
+		}
+	}
+	return relatedKinds
+}
+
+func findChildKinds(kind string) []string {
+	childKinds := make([]string, 0)
+	for _, relStringList := range relationshipMap {
+		for _, relString := range relStringList {
+			relType, _, _, targetKindList := parseRelationship(relString)
+			if relType == relTypeOwnerReference {
+				for _, tk := range targetKindList {
+					childKinds = append(childKinds, tk)
+				}
+			}
+		}
+	}
+	return childKinds
+}
+
+func deepCopy(input Connection) Connection {
+	var output Connection
+	output.Peer = input.Peer
+	output.Name = input.Name
+	output.Kind = input.Kind
+	output.Namespace = input.Namespace
+	output.Level = input.Level
+	output.Owner = input.Owner
+	output.RelationType = input.RelationType
+	output.RelationDetails = input.RelationDetails
+	output.OwnerKind = input.OwnerKind
+	output.OwnerName = input.OwnerName
+	return output
+}
 
 func PrintRelatives(format string, connections []Connection) {
 	switch format {
@@ -316,16 +387,8 @@ func compareConnectionsRelType(c1, c2 Connection) bool {
 func AppendConnections(allConnections []Connection, connection Connection) []Connection {
 	present := false
 	present2 := false
-	//present3 := false
 	//fmt.Printf("connection.Name:%s, connection.Kind:%s\n", connection.Name, connection.Kind)
 	for i, conn := range allConnections {
-		//if connection.Kind == "ClusterIssuer" && (*connection.Peer).Kind == "ClusterIssuer" {
-			//fmt.Printf("Conn:%v, Conn.Peer:%v, Connection:%v, Connection.Peer:%v\n",conn, *conn.Peer, connection, *connection.Peer)			
-		//}
-		//present = compareConnectionsRelType(conn, connection) /// working
-
-		// Case 1: Check if connection exists without any concern with the edge type.
-		// If so, store the connection as new entry towards the end; remove the current entry.
 		if connection.Peer != nil {
 			//fmt.Printf("conn.Kind:%s,", conn.Kind)
 			//fmt.Printf("conn.Name:%s", conn.Name)
@@ -348,14 +411,6 @@ func AppendConnections(allConnections []Connection, connection Connection) []Con
 			break
 		}
 	}
-
-	// Case 3: Check if connection is not same as the original input
-	/*originalInput := Connection{
-		Kind: OrigKind,
-		Name: OrigName,
-		Namespace: OrigNamespace,
-	}
-	present = compareConnections(connection, originalInput)*/
 
 	if !present {
 		// Case 2: Check if connection has not been discovered before 
@@ -382,7 +437,6 @@ func appendConnections1(allConnections, connections []Connection) []Connection {
 				//fmt.Printf("ExistingConn.Name:%s, ExistingConn.Level:%d, conn.Name:%s, conn.Level:%d\n", existingConn.Name, existingConn.Level, conn.Name, conn.Level)
 				if existingConn.Level > conn.Level {
 					existingConn.Level = conn.Level
-					//existingConn.Peer = conn.Peer
 					//fmt.Printf("ExistingLevel:%d, InputLevel:%d\n", existingConn.Level, level) 
 					allConnections[j] = existingConn
 				}
@@ -394,4 +448,88 @@ func appendConnections1(allConnections, connections []Connection) []Connection {
 		}
 	}
 	return allConnections
+}
+
+// extra
+func setPeers(visited []Connection, kind, instance, origkind, originstance, namespace string, origlevel int) []Connection {
+	for _, conn := range visited {
+		if conn.Name == instance && conn.Kind == kind {
+			if conn.Peer == nil {
+				if kind != origkind && instance != originstance {
+						conn.Peer = &Connection{
+						Kind: origkind,
+						Name: originstance,
+						Namespace: namespace,
+					}
+			   }
+			} 
+		}
+	}
+	return visited
+}
+
+func searchConnection(visited []Connection, kind, instance, namespace string) Connection {
+	var foundconn Connection
+	for _, conn := range visited {
+		if conn.Kind == kind && conn.Name == instance && conn.Namespace == namespace {
+			conn = foundconn
+			break
+		}
+	}
+	return foundconn
+}
+
+func getLevel(visited []Connection, conn Connection) int {
+	var level int
+	for _, conni := range visited {
+		if conni.Name == conn.Name && conni.Kind == conn.Kind && conn.Namespace == conni.Namespace {
+			level = conn.Level
+			break
+		}
+	}
+	return level
+}
+
+func appendNextLevelPeers(connections, nextLevelConnections []Connection) ([]Connection) {
+	for _, nconnect := range nextLevelConnections {
+		present := false
+		for _, connect := range connections {
+			if compareConnections(nconnect, connect) {
+				present = true
+				break
+			}
+		}
+		if !present {
+			connections = append(connections, nconnect)
+		}
+	}
+	return connections
+}
+
+func prepare(level int, kind, instance string, connections, relativeNames []Connection, targetKind, namespace, relType, relDetail string) ([]Connection) {
+	preparedConnections := make([]Connection,0)
+	for _, relative := range relativeNames {
+		relativeName := relative.Name
+		ownerKind, ownerInstance := getOwnerDetail(targetKind, relativeName, namespace)
+		ownerDetail := "Owner:" + ownerKind + "/" + ownerInstance
+		connection := Connection{
+			Level: level,
+			Kind: targetKind,
+			Name: relativeName,
+			Namespace: namespace,
+			Owner: ownerDetail,
+			OwnerKind: ownerKind,
+			OwnerName: ownerInstance,
+			RelationType: relType,
+			RelationDetails: relDetail,
+			Peer: &Connection{
+				Name: instance, 
+				Kind: kind,
+				Namespace: namespace,
+				Level: level + 1,
+				},
+		}
+		preparedConnections = append(preparedConnections, connection)
+	}
+	return preparedConnections
 }
