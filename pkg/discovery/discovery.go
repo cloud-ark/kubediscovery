@@ -130,7 +130,8 @@ func readKindCompositionFile(inputKind string) error {
 																	 metav1.GetOptions{})
 			if err != nil {
 				fmt.Errorf("Error:%s\n", err)
-				panic(err)
+				fmt.Printf("Cannot discover Custom Resource connections. But can do rest..")
+				//panic(err)
 				return err
 			}
 			//fmt.Printf("InputKind:%s, thisKind:%s\n", inputKind, crdObj.Spec.Names.Kind)
