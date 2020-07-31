@@ -37,14 +37,14 @@ func main() {
 				format = os.Args[6]
 			}
 			level := 0
-			connections := make([]discovery.Connection, 0)
+			visited := make([]discovery.Connection, 0)
 			relationType := ""
 			discovery.OrigKind = kind
 			discovery.OrigName = instance
 			discovery.OrigNamespace = namespace
 			discovery.OrigLevel = level
 			discovery.BuildCompositionTree(namespace)
-			/*root := discovery.Connection{
+			root := discovery.Connection{
 				Name: instance,
 				Kind: kind,
 				Namespace: namespace,
@@ -54,10 +54,12 @@ func main() {
 					Kind: "",
 					Namespace: "",
 				},
-			}*/
-			//discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
-			
-			connections = discovery.GetRelatives(connections, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
+			}
+			discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
+
+			fmt.Printf("Discovering connections")
+			level = level + 1
+			visited = discovery.GetRelatives(visited, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
 												 namespace, relationType)
 			if len(discovery.TotalClusterConnections) > 0 {
 				discovery.PrintRelatives(format, discovery.TotalClusterConnections)

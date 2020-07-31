@@ -113,6 +113,7 @@ func readKindCompositionFile(inputKind string) error {
 	} else {
 		crdClient, err1 := apiextensionsclientset.NewForConfig(cfg)
 		if err1 != nil {
+			// Should we bail out here or just continue??
 			panic(err1.Error())
 		}
 		crdList, err := crdClient.CustomResourceDefinitions().List(context.TODO(),
