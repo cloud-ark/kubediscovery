@@ -114,7 +114,8 @@ func readKindCompositionFile(inputKind string) error {
 		crdClient, err1 := apiextensionsclientset.NewForConfig(cfg)
 		if err1 != nil {
 			// Should we bail out here or just continue??
-			panic(err1.Error())
+			fmt.Printf("Cannot discover Custom Resource connections. But can do rest..")
+			return err
 		}
 		crdList, err := crdClient.CustomResourceDefinitions().List(context.TODO(),
 																   metav1.ListOptions{})

@@ -57,7 +57,6 @@ func main() {
 			}
 			discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
 
-			fmt.Printf("Discovering connections")
 			level = level + 1
 			visited = discovery.GetRelatives(visited, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
 												 namespace, relationType)

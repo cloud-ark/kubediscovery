@@ -13,16 +13,15 @@ import (
 )
 
 func GetRelatives(visited [] Connection, level int, kind, instance, origkind, originstance, namespace, relType string) ([]Connection) {
-	err := readKindCompositionFile(kind)
-	if err != nil {
+	_ = readKindCompositionFile(kind)
+	/*if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		return visited
-	}
+	}*/
 	exists := checkExistence(kind, instance, namespace)
 	if exists {
 	//fmt.Printf("Node - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s relType:%s\n", level, kind, instance, origkind, originstance, relType)
-	//fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
-    fmt.Printf(".")
+	fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
 		inputInstance := Connection{
 			Name: instance,
 			Kind: kind,
@@ -134,8 +133,11 @@ func findUpstreamRelatives(visited []Connection, level int, relatedKind, kind, i
 func buildGraph(visited []Connection, level int, kind, instance string, relativesNames []Connection, targetKind, namespace, relType, relDetail string) ([]Connection) {
 	unseenRelatives, seenRelatives := filterConnections(visited, relativesNames)
 
+	/*fmt.Printf("unseenRelatives:%v\n", unseenRelatives)
+	fmt.Printf("seenRelatives:%v\n", seenRelatives)*/
+
 	visited = appendCurrentLevelPeers(visited, relativesNames)
-	_ = searchNextLevel(visited, level, unseenRelatives, kind, instance, targetKind, namespace, relType)
+	visited = searchNextLevel(visited, level, unseenRelatives, kind, instance, targetKind, namespace, relType)
 
 	for _, conn := range seenRelatives {
 		TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
@@ -154,11 +156,6 @@ func filterConnections(allConnections []Connection, currentConnections []Connect
 			   currentConn.Kind == conn.Kind && 
 			   currentConn.Namespace == conn.Namespace {
 				found = true
-				if currentConn.Level < conn.Level {
-					conn.Level = currentConn.Level
-				}
-			}
-			if found {
 				// Note that the connection object in allConnections might 
 				// have empty Peer. This causes the o/p to show duplicate entries.
 				// So copying the connection from the input.
@@ -210,6 +207,7 @@ func findCompositionConnections(visited []Connection, level int, kind, instance,
 	}
 
 	childrenToSearch, seenRelatives := filterConnections(visited, childrenConnections)
+
 	if len(childrenToSearch) > 0 {
 		level = level + 1
 		for _, conn := range childrenToSearch {
@@ -256,11 +254,10 @@ func findParentConnections(visited []Connection, level int, kind, instance, name
 				Namespace: "",
 			}
 		}
-		//fmt.Print("Ownerconn:%v\n", ownerConn)
+
 		owners := make([]Connection,0)
 		owners = append(owners, ownerConn)
 		ownerToSearch, seenRelatives := filterConnections(visited, owners)
-		//fmt.Printf("Owners to search:%v\n", ownerToSearch)
 
 		if len(ownerToSearch) > 0 {
 			level = level + 1
