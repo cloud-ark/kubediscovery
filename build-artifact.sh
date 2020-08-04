@@ -8,9 +8,9 @@ artifacttype=$1
 
 if [ "$artifacttype" = "latest" ]; then
     export GOOS=linux; go build .
-    cp kubediscovery ./artifacts/simple-image/kube-discovery-apiserver
-    docker build -t lmecld/kube-discovery-apiserver:latest ./artifacts/simple-image
-    docker push lmecld/kube-discovery-apiserver:latest
+    cp kubediscovery ./artifacts/simple-image/kubediscovery
+    docker build -t lmecld/kubediscovery:latest ./artifacts/simple-image
+    docker push lmecld/kubediscovery:latest
 fi
 
 if [ "$artifacttype" = "versioned" ]; then
