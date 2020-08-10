@@ -69,6 +69,16 @@ type Connection struct {
 	Peer           *Connection
 }
 
+type ConnectionOutput struct {
+	Level           int
+	Kind            string
+	Name            string
+	Namespace       string
+	PeerKind		string
+	PeerName		string
+	PeerNamespace	string
+}
+
 var (
 
 	USAGE_ANNOTATION string
@@ -113,6 +123,7 @@ var (
 	// Set to inputs given to connections
 	OrigKind, OrigName, OrigNamespace string
 	OrigLevel int
+	OutputFormat string
 )
 
 func init() {

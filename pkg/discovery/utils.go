@@ -271,7 +271,26 @@ func PrintRelatives(format string, connections []Connection) {
 }
 
 func printConnectionsJSON(connections []Connection) {
-	fmt.Printf("%v", connections)
+	//fmt.Printf("%v", connections)
+	connectionsOutput := make([]ConnectionOutput,0)
+	for _, conn := range connections {
+		op := ConnectionOutput{
+			Level: conn.Level,
+			Kind: conn.Kind,
+			Name: conn.Name,
+			Namespace: conn.Namespace,
+			PeerKind: conn.Peer.Kind,
+			PeerName: conn.Peer.Name,
+			PeerNamespace: conn.Peer.Namespace,
+		}
+		connectionsOutput = append(connectionsOutput, op)
+	}
+	connectionsBytes, err := json.Marshal(connectionsOutput)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	connectionsString := string(connectionsBytes)
+	fmt.Printf("%s\n", connectionsString)
 }
 
 func printConnections(connections []Connection, printtype string) {
