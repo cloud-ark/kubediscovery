@@ -21,8 +21,10 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 	exists := checkExistence(kind, instance, namespace)
 	if exists {
 	//fmt.Printf("Node - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s relType:%s\n", level, kind, instance, origkind, originstance, relType)
-	fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
-		inputInstance := Connection{
+	if OutputFormat != "json" {
+		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
+	} 
+			inputInstance := Connection{
 			Name: instance,
 			Kind: kind,
 			Namespace: namespace,

@@ -12,13 +12,17 @@ import (
 )
 
 func main() {
-	if len(os.Args) == 7  || len(os.Args) == 5 || len(os.Args) == 3 {
+	//if len(os.Args) == 7  || len(os.Args) == 5 || len(os.Args) == 3 {
+	if len(os.Args) >= 2 {
 		var kind, instance, namespace string
 		// kubediscovery connections Moodle moodle1 default -o flat
 		// kubediscovery composition Moodle moodle1 default
 		// kubediscovery man Moodle 
 		commandType := os.Args[1]
 		if commandType == "composition" {
+			if len(os.Args) != 5 {
+				panic("Not enough arguments: ./kubediscovery composition <kind> <instance> <namespace>")
+			}
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
@@ -29,12 +33,15 @@ func main() {
 			fmt.Printf("%s\n", composition)
 		}
 		if commandType == "connections" {
+			if len(os.Args) < 5  {
+				panic("Not enough arguments:./kubediscovery connections <kind> <instance> <namespace>")
+			}
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
-			format := "default"
+			discovery.OutputFormat = "default"
 			if len(os.Args) == 7 {
-				format = os.Args[6]
+				discovery.OutputFormat = os.Args[6]
 			}
 			level := 0
 			visited := make([]discovery.Connection, 0)
@@ -61,10 +68,13 @@ func main() {
 			visited = discovery.GetRelatives(visited, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
 												 namespace, relationType)
 			if len(discovery.TotalClusterConnections) > 0 {
-				discovery.PrintRelatives(format, discovery.TotalClusterConnections)
+				discovery.PrintRelatives(discovery.OutputFormat, discovery.TotalClusterConnections)
 			}
 		}
 		if commandType == "man" {
+			if len(os.Args) != 3 {
+				panic("Not enough arguments:./kubediscovery man <kind>.")
+			}
 			kind := os.Args[2]
 			manPage := apiserver.GetManPage(kind)
 			fmt.Printf("%s\n", manPage)
