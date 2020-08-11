@@ -53,6 +53,18 @@ func homeDir() string {
 	return os.Getenv("USERPROFILE") // windows
 }
 
+func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
+	if _, err := os.Stat(kubeconfigpath); err == nil {
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfigpath)
+		if err != nil {
+			fmt.Printf("kubeconfig error:%s\n", err.Error())
+		}
+	} else {
+		panic(err)
+	}
+	return cfg, nil
+}
+
 func getDynamicClient() (dynamic.Interface, error) {
 	if dynamicClient == nil {
 		dynamicClient, err = dynamic.NewForConfig(cfg)

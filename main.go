@@ -5,6 +5,7 @@ import (
 	"os"
 	"fmt"
 	"time"
+	"strings"
 //	genericapiserver "k8s.io/apiserver/pkg/server"
 //	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
@@ -41,6 +42,15 @@ func main() {
 			namespace = os.Args[4]
 			discovery.OutputFormat = "default"
 			if len(os.Args) == 7 {
+				discovery.OutputFormat = os.Args[6]
+			}
+			if len(os.Args) == 8 {
+				kubeconfig := os.Args[7]
+				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfig)
+				kubeconfigparts := strings.Split(kubeconfig, "=")
+				kubeconfigpath := kubeconfigparts[1]
+				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
+				discovery.BuildConfig(kubeconfigpath)
 				discovery.OutputFormat = os.Args[6]
 			}
 			level := 0
