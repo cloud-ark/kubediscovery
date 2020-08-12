@@ -425,7 +425,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 			for key, value := range annotations {
 				//fmt.Printf("Key:%s, AnnotationKey:%s, value:%s, lhsName:%s\n", key, annotationKey, value, lhsName)
 				if instance == "*" {
-					if key == annotationKey && value == lhsName {
+					if key == annotationKey && (value == lhsName || strings.Contains(value, lhsName)) {
 						//rhsInstanceName := unstructuredObj.GetName()
 						//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
 						relDetail = annotationKey + "::" + annotationValue
@@ -784,7 +784,14 @@ func parseRelationship(relString string) (string, string, string, []string) {
 	if relType == relTypeAnnotation {
 		targetKind := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
 		lhs = strings.Split(strings.TrimSpace(parts[2]), ":")[1]
-		rhs = strings.Split(strings.TrimSpace(parts[3]), ":")[1]
+		rhsparts := strings.Split(strings.TrimSpace(parts[3]), ":")
+		if len(rhsparts) == 2 { // value:name
+			rhs = rhsparts[1]
+		} else if len(rhsparts) == 3 { //value:[{name:INSTANCE.metadata.name}]
+			rhs = rhsparts[2]
+			rhs = strings.ReplaceAll(rhs, "}", "")
+			rhs = strings.ReplaceAll(rhs, "]", "")
+		}
 		targetKindList = append(targetKindList, targetKind)
 	}
 	if relType == relTypeOwnerReference {
