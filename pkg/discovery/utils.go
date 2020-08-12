@@ -23,14 +23,7 @@ var (
 	dynamicClient dynamic.Interface
 )
 
-func init() {
-	cfg, err = buildConfig()
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
-func buildConfig() (*rest.Config, error) {
+func BuildConfig1() (*rest.Config, error) {
 	if home := homeDir(); home != "" {
 		kubeconfig := filepath.Join(home, ".kube", "config")
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -39,7 +32,8 @@ func buildConfig() (*rest.Config, error) {
 			fmt.Printf("Trying inClusterConfig..")
 			cfg, err = rest.InClusterConfig()
 			if err != nil {
-				return nil, err
+				panic(err)
+				//return nil, err
 			}
 		}
 	}
@@ -59,8 +53,18 @@ func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
 		if err != nil {
 			fmt.Printf("kubeconfig error:%s\n", err.Error())
 		}
-	} else {
-		panic(err)
+	} else if home := homeDir(); home != "" {
+		kubeconfig := filepath.Join(home, ".kube", "config")
+		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			fmt.Printf("kubeconfig error:%s\n", err.Error())
+			fmt.Printf("Trying inClusterConfig..")
+			cfg, err = rest.InClusterConfig()
+			if err != nil {
+				panic(err)
+				//return nil, err
+			}
+		}
 	}
 	return cfg, nil
 }

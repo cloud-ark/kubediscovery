@@ -268,7 +268,7 @@ func GetOpenAPISpec_prev(customResourceKind string) string {
 func readConfigMap(implementationDetailsString string) (string, error) {
 
 //	cfg, err := rest.InClusterConfig()
-	cfg, err = buildConfig()
+	cfg, err = BuildConfig("")
 	if err != nil {
 		fmt.Printf("Error:%s\n", err.Error())
 		return "", err

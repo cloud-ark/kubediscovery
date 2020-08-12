@@ -21,12 +21,25 @@ func main() {
 		// kubediscovery man Moodle 
 		commandType := os.Args[1]
 		if commandType == "composition" {
-			if len(os.Args) != 5 {
+			if len(os.Args) < 5 {
 				panic("Not enough arguments: ./kubediscovery composition <kind> <instance> <namespace>")
 			}
-			kind = os.Args[2]
-			instance = os.Args[3]
-			namespace = os.Args[4]
+			if len(os.Args) == 5 {
+				kind = os.Args[2]
+				instance = os.Args[3]
+				namespace = os.Args[4]
+				discovery.BuildConfig("")
+			}
+			if len(os.Args) == 6 {
+				kind = os.Args[2]
+				instance = os.Args[3]
+				namespace = os.Args[4]
+				kubeconfig := os.Args[5]
+				kubeconfigparts := strings.Split(kubeconfig, "=")
+				kubeconfigpath := kubeconfigparts[1]
+				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
+				discovery.BuildConfig(kubeconfigpath)
+			}
 			discovery.BuildCompositionTree(namespace)
 			composition := discovery.TotalClusterCompositions.GetCompositionsString(kind,
 																			  instance,
@@ -52,6 +65,8 @@ func main() {
 				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
 				discovery.BuildConfig(kubeconfigpath)
 				discovery.OutputFormat = os.Args[6]
+			} else {
+				discovery.BuildConfig("")
 			}
 			level := 0
 			visited := make([]discovery.Connection, 0)
@@ -82,6 +97,7 @@ func main() {
 			}
 		}
 		if commandType == "man" {
+			discovery.BuildConfig("")
 			if len(os.Args) != 3 {
 				panic("Not enough arguments:./kubediscovery man <kind>.")
 			}
@@ -96,6 +112,7 @@ func main() {
 	} else {
 		fmt.Printf("Running from within cluster.\n")
 		fmt.Printf("Installing KubePlus paths.\n")
+		discovery.BuildConfig("")
 		go apiserver.InstallKubePlusPaths()
 		fmt.Printf("After installing KubePlus paths.\n")
 		// Run forever

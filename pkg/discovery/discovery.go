@@ -5,7 +5,6 @@ import (
 	"context"
 	cert "crypto/x509"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -34,18 +33,6 @@ var (
 )
 
 func init() {
-
-	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-	flag.StringVar(&etcdservers, "etcd-servers", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
-	flag.Parse()
-
-	serviceHost = os.Getenv("KUBERNETES_SERVICE_HOST")
-	servicePort = os.Getenv("KUBERNETES_SERVICE_PORT")
-
-	cfg, err = buildConfig()
-	if err != nil {
-		panic(err.Error())
-	}
 }
 
 func BuildCompositionTree(namespace string) {
