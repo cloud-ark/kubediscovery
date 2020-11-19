@@ -28,8 +28,8 @@ func BuildConfig1() (*rest.Config, error) {
 		kubeconfig := filepath.Join(home, ".kube", "config")
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			fmt.Printf("kubeconfig error:%s\n", err.Error())
-			fmt.Printf("Trying inClusterConfig..")
+			//fmt.Printf("kubeconfig error:%s\n", err.Error())
+			//fmt.Printf("Trying inClusterConfig..")
 			cfg, err = rest.InClusterConfig()
 			if err != nil {
 				panic(err)
@@ -57,8 +57,8 @@ func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
 		kubeconfig := filepath.Join(home, ".kube", "config")
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
-			fmt.Printf("kubeconfig error:%s\n", err.Error())
-			fmt.Printf("Trying inClusterConfig..")
+			//fmt.Printf("kubeconfig error:%s\n", err.Error())
+			//fmt.Printf("Trying inClusterConfig..")
 			cfg, err = rest.InClusterConfig()
 			if err != nil {
 				panic(err)
