@@ -622,6 +622,14 @@ func findFieldValue(lhsContent interface{}, specfield string) (string, bool) {
 		}
 	}
 	//fmt.Printf("FieldValue:%s\n", fieldValue)
+
+	// Handle default field values such as Pod.spec.serviceAccountName
+	if !found {
+		if specfield == "serviceAccountName" {
+			fieldValue = "default"
+			found = true
+		}
+	}
 	return fieldValue, found
 }
 
