@@ -100,6 +100,7 @@ var (
 	REPLICA_SET  string
 	DEPLOYMENT   string
 	POD          string
+	SERVICE_ACCOUNT string
 	CONFIG_MAP   string
 	SERVICE      string
 	SECRET       string
@@ -143,6 +144,7 @@ func init() {
 	DAEMONSET = "DaemonSet"
 	RC = "ReplicationController"
 	PDB = "PodDisruptionBudget"
+	SERVICE_ACCOUNT = "ServiceAccount"
 
 	relTypeLabel = "label"
 	relTypeSpecProperty = "specproperty"
@@ -207,9 +209,18 @@ func init() {
 	podRelationships := make([]string,0)
 	podRel0 := "specproperty, on:INSTANCE.spec.env, value:Service.spec.metadata.name"
 	podRel1 := "specproperty, on:INSTANCE.spec.volumes.persistentVolumeClaim.claimName, value:PersistentVolumeClaim.spec.metadata.name"
+	podRel2 := "specproperty, on:INSTANCE.spec.serviceAccountName, value:ServiceAccount.metadata.name"
 	podRelationships = append(podRelationships, podRel0)
 	podRelationships = append(podRelationships, podRel1)
+	podRelationships = append(podRelationships, podRel2)
 	relationshipMap[POD] = podRelationships
+
+	KindPluralMap[SERVICE_ACCOUNT] = "serviceaccounts"
+	kindVersionMap[SERVICE_ACCOUNT] = "api/v1"
+	kindGroupMap[SERVICE_ACCOUNT] = ""
+	compositionMap[SERVICE_ACCOUNT] = []string{}
+
+
 
 	KindPluralMap[SERVICE] = "services"
 	kindVersionMap[SERVICE] = "api/v1"
@@ -238,6 +249,10 @@ func init() {
 	kindVersionMap[PVCLAIM] = "api/v1"
 	kindGroupMap[PVCLAIM] = ""
 	compositionMap[PVCLAIM] = []string{}
+	pvcRelationships := make([]string,0)
+	pvcRel := "specproperty, on:INSTANCE.spec.volumeName, value:PersistentVolume.metadata.name"
+	pvcRelationships = append(pvcRelationships, pvcRel)
+	relationshipMap[PVCLAIM] = pvcRelationships
 
 	KindPluralMap[PV] = "persistentvolumes"
 	kindVersionMap[PV] = "api/v1"
