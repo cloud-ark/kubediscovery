@@ -292,16 +292,22 @@ func findChildrenConnections(visited []Connection, level int, kind, instance, na
 		childRes := schema.GroupVersionResource{Group: childResGroup,
 										 		Version: childResApiVersion,
 										   		Resource: childResKindPlural}
-		dynamicClient, err := getDynamicClient()
+		//dynamicClient, err := getDynamicClient()
 
+		children, err := getKubeObjectList(relKind, namespace, childRes)
+		if err != nil {
+				return visited
+		}
+		/*
 		children, err := dynamicClient.Resource(childRes).Namespace(namespace).List(context.TODO(),
 																	   		 	    metav1.ListOptions{})
+
 		if err != nil {
 			children, err = dynamicClient.Resource(childRes).List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return visited
 			}
-		}
+		}*/
 		for _, child := range children.Items {
 			ownerKind, ownerInstance := findOwner(child)
 			if ownerKind == kind && ownerInstance == instance {
@@ -397,7 +403,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
 	//fmt.Printf("%v\n", lhsRes)
-	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
+	lhsInstList, err := getObjects(kind, instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, relDetail
 	}
@@ -406,7 +412,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
-	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
+	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, relDetail
 	}
@@ -500,7 +506,7 @@ func searchSpecPropertyField(level int, kind, instance, namespace, lhs, rhs, tar
 	if err != nil {
 		return relativesNames, propertyNameValue
 	}
-	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
+	lhsInstList, err := getObjects(kind, instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, propertyNameValue
 	}
@@ -509,7 +515,7 @@ func searchSpecPropertyField(level int, kind, instance, namespace, lhs, rhs, tar
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
-	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
+	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, propertyNameValue
 	}
@@ -645,7 +651,7 @@ func searchSpecPropertyEnv(level int, kind, instance, namespace, rhs, targetKind
 	lhsRes := schema.GroupVersionResource{Group: lhsResGroup,
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
-	lhsInstList, err := getObjects(instance, namespace, lhsRes, dynamicClient)
+	lhsInstList, err := getObjects(kind, instance, namespace, lhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, envNameValue
 	}
@@ -654,7 +660,7 @@ func searchSpecPropertyEnv(level int, kind, instance, namespace, rhs, targetKind
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
-	rhsInstList, err := getObjects(targetInstance, namespace, rhsRes, dynamicClient)
+	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, envNameValue
 	}
@@ -734,10 +740,12 @@ func searchSpecPropertyEnv(level int, kind, instance, namespace, rhs, targetKind
 	return relativesNames, envNameValue
 }
 
-func getObjects(instance, namespace string, res schema.GroupVersionResource, dynamicClient dynamic.Interface) ([]*unstructured.Unstructured, error) {
+func getObjects(kind, instance, namespace string, res schema.GroupVersionResource, dynamicClient dynamic.Interface) ([]*unstructured.Unstructured, error) {
 	lhsInstList := make([]*unstructured.Unstructured,0)
+	//fmt.Printf("Inside getObjects..%s %s\n", kind, instance)
 	var err error
 	if instance == "*" {
+		/*
 		lhsInstances, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
 																		   		 	metav1.ListOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -746,7 +754,13 @@ func getObjects(instance, namespace string, res schema.GroupVersionResource, dyn
 				//panic(err)
 				return lhsInstList, err
 			}
+		}*/
+		
+		lhsInstances, err := getKubeObjectList(kind, namespace, res)
+		if err != nil {
+			return lhsInstList, err
 		}
+
 		for _, lhsObj := range lhsInstances.Items {
 			//lhsName := lhsObj.GetName()
 			//fmt.Printf("&&&%s\n", lhsName)
@@ -825,6 +839,8 @@ func getLabels(kind, instance, namespace string) map[string]string {
 	instanceObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(),
 																			 instance,
 																	   		 metav1.GetOptions{})
+
+	//instanceObj, err := getKubeObject(kind, instance, namespace, res)
 	if err != nil {
 		//fmt.Printf("ABC\n")
 		//fmt.Printf(err.Error())
@@ -837,6 +853,7 @@ func getLabels(kind, instance, namespace string) map[string]string {
 func getSelectorLabels(kind, instance, namespace string) map[string]string {
 	selectorMap := make(map[string]string)
 	var found bool
+
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
 		fmt.Printf(err.Error())
@@ -850,6 +867,9 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 	instanceObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(),
 																			 instance,
 																	   		 metav1.GetOptions{})
+	
+	//instanceObj, err := getKubeObject(kind, instance, namespace, res)
+
 	if err != nil {
 		fmt.Printf(err.Error())
 		return selectorMap
@@ -866,16 +886,19 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 func searchSelectors(level int, lhsKind string, labelMap map[string]string, rhsKind, rhsInstance, namespace string) ([]Connection, string) {
 	instanceNames := make([]Connection, 0)
 	relDetail := ""
-	dynamicClient, err := getDynamicClient()
+	/*dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return instanceNames, relDetail
-	}
+	}*/
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(lhsKind)
 	res := schema.GroupVersionResource{Group: resourceGroup,
 									   Version: resourceApiVersion,
 									   Resource: resourceKindPlural}
-	list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
-																	   metav1.ListOptions{})
+
+	list, err := getKubeObjectList(lhsKind, namespace, res)
+		
+	/*list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
+																	   metav1.ListOptions{}) */
 	if err != nil {
 		return instanceNames, relDetail
 	}
@@ -929,16 +952,19 @@ func searchNameInLabels(name string, label map[string]string) bool {
 func searchLabels(level int, sourceKind, sourceInstance string, labelMap map[string]string, targetKind, namespace string) ([]Connection, string) {
 	instanceNames := make([]Connection, 0)
 	relDetail := ""
-	dynamicClient, err := getDynamicClient()
+	/*dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return instanceNames, relDetail
-	}
+	}*/
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(targetKind)
 	res := schema.GroupVersionResource{Group: resourceGroup,
 									   Version: resourceApiVersion,
 									   Resource: resourceKindPlural}
-	list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
-																	   metav1.ListOptions{})
+
+	list, err := getKubeObjectList(targetKind, namespace, res)
+
+	/*list, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
+																	   metav1.ListOptions{})*/
 	if err != nil {
 		return instanceNames, relDetail
 	}

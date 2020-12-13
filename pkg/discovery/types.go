@@ -3,6 +3,7 @@ package discovery
 import (
 	"sync"
 	"strings"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Used for unmarshalling JSON output from the main API server
@@ -79,6 +80,13 @@ type ConnectionOutput struct {
 	PeerNamespace	string
 }
 
+type KubeObjectCacheEntry struct {
+	Namespace string
+	Kind string
+	Name string
+	GVK schema.GroupVersionResource
+}
+
 var (
 
 	USAGE_ANNOTATION string
@@ -96,6 +104,9 @@ var (
 	compositionMap map[string][]string
 	relationshipMap map[string][]string
 	crdcompositionMap map[string][]string
+
+	kubeObjectListCache map[KubeObjectCacheEntry]interface{}
+	kubeObjectCache map[KubeObjectCacheEntry]interface{}
 
 	REPLICA_SET  string
 	DEPLOYMENT   string
@@ -167,6 +178,9 @@ func init() {
 	kindGroupMap = make(map[string]string)
 	relationshipMap = make(map[string][]string)
 
+	kubeObjectListCache = make(map[KubeObjectCacheEntry]interface{})
+	kubeObjectCache = make(map[KubeObjectCacheEntry]interface{})
+
 	// set basic data types
 	KindPluralMap[DEPLOYMENT] = "deployments"
 	kindVersionMap[DEPLOYMENT] = "apis/apps/v1"
@@ -219,8 +233,6 @@ func init() {
 	kindVersionMap[SERVICE_ACCOUNT] = "api/v1"
 	kindGroupMap[SERVICE_ACCOUNT] = ""
 	compositionMap[SERVICE_ACCOUNT] = []string{}
-
-
 
 	KindPluralMap[SERVICE] = "services"
 	kindVersionMap[SERVICE] = "api/v1"
