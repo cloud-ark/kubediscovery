@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var (
@@ -74,6 +75,79 @@ func getDynamicClient() (dynamic.Interface, error) {
 		dynamicClient, err = dynamic.NewForConfig(cfg)
 	}
 	return dynamicClient, err
+}
+
+func getKubeObjectList(kind, namespace string, gvk schema.GroupVersionResource) (*unstructured.UnstructuredList, error) {
+	found := false
+	var objectList *unstructured.UnstructuredList
+	for k, v := range kubeObjectListCache {
+		if k.Kind == kind && k.Namespace == namespace && checkGVK(k.GVK, gvk) {
+			found = true
+			//fmt.Printf("Kind:%s found in cache\n", kind)
+			objectList = v.(*unstructured.UnstructuredList)
+		}
+	}
+	if !found {
+		//fmt.Printf("Kind:%s not found in cache\n", kind)
+		objectList, err = dynamicClient.Resource(gvk).Namespace(namespace).List(context.TODO(),
+																		   		 	metav1.ListOptions{})
+		if err != nil { // Check if this is a non-namespaced resource
+			objectList, err = dynamicClient.Resource(gvk).List(context.TODO(), metav1.ListOptions{})
+			if err != nil {
+				//panic(err)
+				return nil, err
+			}
+		}
+		entry := KubeObjectCacheEntry{
+			Namespace: namespace,
+			Kind: kind,
+			GVK: gvk, 
+		}
+		kubeObjectListCache[entry] = objectList
+	}
+	return objectList, nil
+}
+
+func getKubeObject(kind, instance, namespace string, gvk schema.GroupVersionResource) (*unstructured.Unstructured, error) {
+	found := false
+	var obj *unstructured.Unstructured
+	for k, v := range kubeObjectCache {
+		if k.Kind == kind && k.Namespace == namespace && k.Name == instance && checkGVK(k.GVK, gvk) {
+			found = true
+			//fmt.Printf("Kind:%s found in cache\n", kind)
+			obj = v.(*unstructured.Unstructured)
+		}
+	}
+	if !found {
+		//fmt.Printf("Kind:%s not found in cache\n", kind)
+		obj, err := dynamicClient.Resource(gvk).Namespace(namespace).Get(context.TODO(),
+																			 instance,
+																	   		 metav1.GetOptions{})
+
+		if err != nil { // Check if this is a non-namespaced resource
+			obj, err = dynamicClient.Resource(gvk).Get(context.TODO(), instance, metav1.GetOptions{})
+			if err != nil {
+				//panic(err)
+				return nil, err
+			}
+		}
+		entry := KubeObjectCacheEntry{
+			Namespace: namespace,
+			Kind: kind,
+			Name: instance,
+			GVK: gvk, 
+		}
+		kubeObjectCache[entry] = obj
+	}
+	return obj, nil
+}
+
+func checkGVK(lhs, rhs schema.GroupVersionResource) bool {
+	if lhs.Group == rhs.Group && lhs.Version == rhs.Version && lhs.Resource == rhs.Resource {
+		return true
+	} else {
+		return false
+	}
 }
 
 // Composition utility functions
