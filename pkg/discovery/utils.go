@@ -71,6 +71,9 @@ func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
 }
 
 func getDynamicClient() (dynamic.Interface, error) {
+	if cfg == nil {
+		_, _ = BuildConfig1()
+	}
 	if dynamicClient == nil {
 		dynamicClient, err = dynamic.NewForConfig(cfg)
 	}
@@ -277,7 +280,7 @@ func printMaps() {
 }
 
 // Connection utility functions
-func checkExistence(kind, instance, namespace string) bool {
+func CheckExistence(kind, instance, namespace string) bool {
 	if instance == "" {
 		return false
 	}

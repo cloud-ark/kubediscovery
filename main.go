@@ -53,47 +53,53 @@ func main() {
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
-			discovery.OutputFormat = "default"
-			if len(os.Args) == 7 {
-				discovery.OutputFormat = os.Args[6]
-			}
-			if len(os.Args) == 8 {
-				kubeconfig := os.Args[7]
-				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfig)
-				kubeconfigparts := strings.Split(kubeconfig, "=")
-				kubeconfigpath := kubeconfigparts[1]
-				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
-				discovery.BuildConfig(kubeconfigpath)
-				discovery.OutputFormat = os.Args[6]
-			} else {
-				discovery.BuildConfig("")
-			}
-			level := 0
-			visited := make([]discovery.Connection, 0)
-			relationType := ""
-			discovery.OrigKind = kind
-			discovery.OrigName = instance
-			discovery.OrigNamespace = namespace
-			discovery.OrigLevel = level
-			discovery.BuildCompositionTree(namespace)
-			root := discovery.Connection{
-				Name: instance,
-				Kind: kind,
-				Namespace: namespace,
-				Level: level,
-				Peer: &discovery.Connection{
-					Name: "",
-					Kind: "",
-					Namespace: "",
-				},
-			}
-			discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
+			exists := discovery.CheckExistence(kind, instance, namespace)
+			if exists {
+				discovery.OutputFormat = "default"
+				if len(os.Args) == 7 {
+					discovery.OutputFormat = os.Args[6]
+				}
+				if len(os.Args) == 8 {
+					kubeconfig := os.Args[7]
+					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfig)
+					kubeconfigparts := strings.Split(kubeconfig, "=")
+					kubeconfigpath := kubeconfigparts[1]
+					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
+					discovery.BuildConfig(kubeconfigpath)
+					discovery.OutputFormat = os.Args[6]
+				} else {
+					discovery.BuildConfig("")
+				}
+				level := 0
+				visited := make([]discovery.Connection, 0)
+				relationType := ""
+				discovery.OrigKind = kind
+				discovery.OrigName = instance
+				discovery.OrigNamespace = namespace
+				discovery.OrigLevel = level
+				discovery.BuildCompositionTree(namespace)
+				root := discovery.Connection{
+					Name: instance,
+					Kind: kind,
+					Namespace: namespace,
+					Level: level,
+					Peer: &discovery.Connection{
+						Name: "",
+						Kind: "",
+						Namespace: "",
+					},
+				}
+				discovery.TotalClusterConnections = discovery.AppendConnections(discovery.TotalClusterConnections, root)
 
-			level = level + 1
-			visited = discovery.GetRelatives(visited, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
-												 namespace, relationType)
-			if len(discovery.TotalClusterConnections) > 0 {
-				discovery.PrintRelatives(discovery.OutputFormat, discovery.TotalClusterConnections)
+				level = level + 1
+				visited = discovery.GetRelatives(visited, level, kind, instance, discovery.OrigKind, discovery.OrigName, 
+													 namespace, relationType)
+				if len(discovery.TotalClusterConnections) > 0 {
+					discovery.PrintRelatives(discovery.OutputFormat, discovery.TotalClusterConnections)
+				}
+			} else {
+				fmt.Printf("Resource %s of kind %s in namespace %s does not exist.\n", instance, kind, namespace)
+				os.Exit(1)
 			}
 		}
 		if commandType == "man" {

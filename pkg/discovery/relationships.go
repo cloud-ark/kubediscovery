@@ -4,7 +4,6 @@ import (
 	"strings"
 	"fmt"
 	"context"
-	"os"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -18,8 +17,7 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 		fmt.Printf("Error: %s\n", err.Error())
 		return visited
 	}*/
-	exists := checkExistence(kind, instance, namespace)
-	if exists {
+
 	//fmt.Printf("Node - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s relType:%s\n", level, kind, instance, origkind, originstance, relType)
 	if OutputFormat != "json" {
 		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
@@ -47,12 +45,7 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 		inputInstanceList := make([]Connection,0)
 		inputInstanceList = append(inputInstanceList, inputInstance)
 		visited = appendCurrentLevelPeers(visited, inputInstanceList)
-
 		visited = findRelatives(visited, level, kind, instance, origkind, originstance, namespace, relType)
-	} else {
-		fmt.Printf("Resource %s of kind %s in namespace %s does not exist.\n", instance, kind, namespace)
-		os.Exit(1)
-	}
 	return visited
 }
 
