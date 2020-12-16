@@ -78,6 +78,7 @@ type ConnectionOutput struct {
 	PeerKind		string
 	PeerName		string
 	PeerNamespace	string
+	RelationType	string
 }
 
 type KubeObjectCacheEntry struct {
