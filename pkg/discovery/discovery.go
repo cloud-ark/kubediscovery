@@ -74,6 +74,11 @@ func BuildCompositionTree(namespace string) {
 	TotalClusterCompositions.purgeCompositionOfDeletedItems(resourceInCluster)
 }
 
+func ReadKinds(inputKind string) error {
+	err := readKindCompositionFile(inputKind)
+	return err
+}
+
 func readKindCompositionFile(inputKind string) error {
 	filePath, ok := os.LookupEnv("KIND_COMPOSITION_FILE")
 	if ok {

@@ -53,6 +53,8 @@ func main() {
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
+			discovery.BuildConfig("")
+			_ = discovery.ReadKinds(kind)
 			exists := discovery.CheckExistence(kind, instance, namespace)
 			if exists {
 				discovery.OutputFormat = "default"

@@ -375,6 +375,7 @@ func printConnectionsJSON(connections []Connection) {
 			PeerKind: conn.Peer.Kind,
 			PeerName: conn.Peer.Name,
 			PeerNamespace: conn.Peer.Namespace,
+			RelationType: conn.RelationType,
 		}
 		connectionsOutput = append(connectionsOutput, op)
 	}
