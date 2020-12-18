@@ -8,6 +8,7 @@ import (
 	"log"
 	"strconv"
 	"sort"
+	"sync"
 	"path/filepath"
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/dynamic"
@@ -22,6 +23,8 @@ var (
 	cfg *rest.Config
 	err error
 	dynamicClient dynamic.Interface
+    wg sync.WaitGroup
+    mu sync.RWMutex
 )
 
 func BuildConfig1() (*rest.Config, error) {
@@ -80,6 +83,30 @@ func getDynamicClient() (dynamic.Interface, error) {
 	return dynamicClient, err
 }
 
+func FetchGVKs(namespace string) {
+	kindPrefetchList := [...]string{"Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Service", "ServiceAccount", "Pod"}
+	for _, k := range kindPrefetchList {
+		wg.Add(1)
+		fmt.Printf("Kind:%s\n", k)
+		go func(kind string) {
+			defer wg.Done()
+		childResKindPlural, _, childResApiVersion, childResGroup := getKindAPIDetails(k)
+		childRes := schema.GroupVersionResource{Group: childResGroup,
+										 		Version: childResApiVersion,
+										   		Resource: childResKindPlural}
+
+
+
+
+			fmt.Printf("Fetching %s\n", kind)
+			mu.Lock()
+			getKubeObjectList(k, namespace, childRes)
+			mu.Unlock()
+		}(k)
+	}
+	wg.Wait()
+}
+
 func getKubeObjectList(kind, namespace string, gvk schema.GroupVersionResource) (*unstructured.UnstructuredList, error) {
 	found := false
 	var objectList *unstructured.UnstructuredList
@@ -111,27 +138,37 @@ func getKubeObjectList(kind, namespace string, gvk schema.GroupVersionResource) 
 	return objectList, nil
 }
 
-func getKubeObject(kind, instance, namespace string, gvk schema.GroupVersionResource) (*unstructured.Unstructured, error) {
+func getKubeObject(kind, instance, namespace string, gvk schema.GroupVersionResource) (unstructured.Unstructured, error) {
 	found := false
-	var obj *unstructured.Unstructured
-	for k, v := range kubeObjectCache {
-		if k.Kind == kind && k.Namespace == namespace && k.Name == instance && checkGVK(k.GVK, gvk) {
-			found = true
-			//fmt.Printf("Kind:%s found in cache\n", kind)
-			obj = v.(*unstructured.Unstructured)
+	var obj unstructured.Unstructured
+
+	entry := KubeObjectCacheEntry{
+		Namespace: namespace,
+		Kind: kind,
+		GVK: gvk, 
+	}
+
+	objList, ok := kubeObjectListCache[entry]
+	if ok {
+		for _, k := range objList.(*unstructured.UnstructuredList).Items {
+			if k.GetKind() == kind && k.GetNamespace() == namespace && k.GetName() == instance {
+				found = true
+				//fmt.Printf("Kind:%s found in cache\n", kind)
+				obj = k
+			}
 		}
 	}
 	if !found {
 		//fmt.Printf("Kind:%s not found in cache\n", kind)
-		obj, err := dynamicClient.Resource(gvk).Namespace(namespace).Get(context.TODO(),
+		obj1, err := dynamicClient.Resource(gvk).Namespace(namespace).Get(context.TODO(),
 																			 instance,
 																	   		 metav1.GetOptions{})
 
 		if err != nil { // Check if this is a non-namespaced resource
-			obj, err = dynamicClient.Resource(gvk).Get(context.TODO(), instance, metav1.GetOptions{})
+			obj1, err = dynamicClient.Resource(gvk).Get(context.TODO(), instance, metav1.GetOptions{})
 			if err != nil {
 				//panic(err)
-				return nil, err
+				return *obj1, err
 			}
 		}
 		entry := KubeObjectCacheEntry{
@@ -286,7 +323,7 @@ func CheckExistence(kind, instance, namespace string) bool {
 	}
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		fmt.Printf("Error: %s\n", err.Error())
+		//fmt.Printf("Error: %s\n", err.Error())
 		return false
 	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)

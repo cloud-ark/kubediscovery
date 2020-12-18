@@ -53,25 +53,26 @@ func main() {
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
-			discovery.BuildConfig("")
+			discovery.OutputFormat = "default"
+			if len(os.Args) == 7 {
+				discovery.OutputFormat = os.Args[6]
+			}
+			if len(os.Args) == 8 {
+				kubeconfig := os.Args[7]
+				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfig)
+				kubeconfigparts := strings.Split(kubeconfig, "=")
+				kubeconfigpath := kubeconfigparts[1]
+				//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
+				discovery.BuildConfig(kubeconfigpath)
+				discovery.OutputFormat = os.Args[6]
+			} else {
+				discovery.BuildConfig("")
+			}
+
 			_ = discovery.ReadKinds(kind)
 			exists := discovery.CheckExistence(kind, instance, namespace)
 			if exists {
-				discovery.OutputFormat = "default"
-				if len(os.Args) == 7 {
-					discovery.OutputFormat = os.Args[6]
-				}
-				if len(os.Args) == 8 {
-					kubeconfig := os.Args[7]
-					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfig)
-					kubeconfigparts := strings.Split(kubeconfig, "=")
-					kubeconfigpath := kubeconfigparts[1]
-					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)
-					discovery.BuildConfig(kubeconfigpath)
-					discovery.OutputFormat = os.Args[6]
-				} else {
-					discovery.BuildConfig("")
-				}
+				//discovery.FetchGVKs(namespace)
 				level := 0
 				visited := make([]discovery.Connection, 0)
 				relationType := ""

@@ -4,6 +4,7 @@ import (
 	"strings"
 	"fmt"
 	"context"
+	"time"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -11,8 +12,12 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+func makeTimestamp() int64 {
+    return time.Now().UnixNano() / int64(time.Millisecond)
+}
+
 func GetRelatives(visited [] Connection, level int, kind, instance, origkind, originstance, namespace, relType string) ([]Connection) {
-	_ = readKindCompositionFile(kind)
+	//_ = readKindCompositionFile(kind)
 	/*if err != nil {
 		fmt.Printf("Error: %s\n", err.Error())
 		return visited
@@ -20,6 +25,7 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 
 	//fmt.Printf("Node - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s relType:%s\n", level, kind, instance, origkind, originstance, relType)
 	if OutputFormat != "json" {
+		_ = makeTimestamp()
 		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
 	} 
 			inputInstance := Connection{
@@ -370,17 +376,19 @@ func getOwnerDetail(kind, instance, namespace string) (string, string) {
 	ownerRes := schema.GroupVersionResource{Group: ownerResGroup,
 									 		Version: ownerResApiVersion,
 									   		Resource: ownerResKindPlural}
-	dynamicClient, err := getDynamicClient()
+	/*dynamicClient, err := getDynamicClient()
 	if err != nil {
 		return ownerKind, ownerInstance
 	}
 	instanceObj, err := dynamicClient.Resource(ownerRes).Namespace(namespace).Get(context.TODO(),
 																			 	  instance,
-																	   		 	  metav1.GetOptions{})
+															   		 	  metav1.GetOptions{})
+	*/
+	instanceObj, err := getKubeObject(kind, instance, namespace, ownerRes)
 	if err != nil {
 		return ownerKind, ownerInstance
 	}
-	ownerKind, ownerInstance = findOwner(*instanceObj)
+	ownerKind, ownerInstance = findOwner(instanceObj)
 	return ownerKind, ownerInstance
 }
 
@@ -735,7 +743,6 @@ func searchSpecPropertyEnv(level int, kind, instance, namespace, rhs, targetKind
 
 func getObjects(kind, instance, namespace string, res schema.GroupVersionResource, dynamicClient dynamic.Interface) ([]*unstructured.Unstructured, error) {
 	lhsInstList := make([]*unstructured.Unstructured,0)
-	//fmt.Printf("Inside getObjects..%s %s\n", kind, instance)
 	var err error
 	if instance == "*" {
 		/*
@@ -761,6 +768,7 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 			lhsInstList = append(lhsInstList, lhsObjCopy)
 		}
 	} else {
+		/*
 		lhsObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(), instance,
 																		   	   metav1.GetOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -769,8 +777,14 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				//panic(err)
 				return lhsInstList, err
 			}
+		}*/
+
+		lhsObj, err1 := getKubeObject(kind, instance, namespace, res)
+		if err1 != nil {
+			err = err1
+		} else {
+			lhsInstList = append(lhsInstList, &lhsObj)
 		}
-		lhsInstList = append(lhsInstList, lhsObj)
 	}
 	return lhsInstList, err
 }
@@ -821,7 +835,7 @@ func getLabels(kind, instance, namespace string) map[string]string {
 	labelMap := make(map[string]string)
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		fmt.Printf(err.Error())
+		//fmt.Printf(err.Error())
 		return labelMap
 	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
@@ -849,7 +863,7 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 
 	dynamicClient, err := getDynamicClient()
 	if err != nil {
-		fmt.Printf(err.Error())
+		//fmt.Printf(err.Error())
 		return selectorMap
 	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
@@ -864,7 +878,7 @@ func getSelectorLabels(kind, instance, namespace string) map[string]string {
 	//instanceObj, err := getKubeObject(kind, instance, namespace, res)
 
 	if err != nil {
-		fmt.Printf(err.Error())
+		//fmt.Printf(err.Error())
 		return selectorMap
 	}
 	content := instanceObj.UnstructuredContent()
