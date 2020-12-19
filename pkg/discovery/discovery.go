@@ -159,11 +159,15 @@ func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
 	//fmt.Printf("%v\n", annotations)
 	//fmt.Printf("&&&&\n")
 	compositionAnnotation := annotations[COMPOSITION_ANNOTATION]
-	if compositionAnnotation != "" {
-		componentKinds := strings.Split(compositionAnnotation, ",")
-		compositionMap[kind] = componentKinds
-		crdcompositionMap[kind] = componentKinds
-	}
+	if compositionAnnotation == "" {
+		// Default set
+		compositionAnnotation = "Deployment, StatefulSet, DaemonSet, ReplicationController, Service, Secret, PodDisruptionBudget, ServiceAccount, PersistentVolumeClaim"
+	} 
+
+	componentKinds := strings.Split(compositionAnnotation, ",")
+	compositionMap[kind] = componentKinds
+	crdcompositionMap[kind] = componentKinds
+
 	//fmt.Printf("=====\n")
 	allRels := getAllRelationships(annotations)
 	//printRels(allRels)
