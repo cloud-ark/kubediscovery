@@ -168,7 +168,7 @@ func getKubeObject(kind, instance, namespace string, gvk schema.GroupVersionReso
 			obj1, err = dynamicClient.Resource(gvk).Get(context.TODO(), instance, metav1.GetOptions{})
 			if err != nil {
 				//panic(err)
-				return *obj1, err
+				return obj, err
 			}
 		}
 		entry := KubeObjectCacheEntry{
@@ -177,7 +177,8 @@ func getKubeObject(kind, instance, namespace string, gvk schema.GroupVersionReso
 			Name: instance,
 			GVK: gvk, 
 		}
-		kubeObjectCache[entry] = obj
+		kubeObjectCache[entry] = obj1
+		obj = *obj1
 	}
 	return obj, nil
 }
@@ -348,12 +349,14 @@ func findRelatedKinds(kind string) []string{
 		for _, relString := range relStringList {
 			_, _, _, targetKindList := parseRelationship(relString)
 			for _, targetKind := range targetKindList {
+				//fmt.Printf("Kind:%s TargetKind:%s\n", kind, targetKind)
 				if targetKind == kind {
 					relatedKinds = append(relatedKinds, key)
 				}
 			}
 		}
 	}
+	//fmt.Printf("Related kinds:%v\n", relatedKinds)
 	return relatedKinds
 }
 

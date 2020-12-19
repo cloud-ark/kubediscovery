@@ -64,6 +64,7 @@ func findRelatives(visited []Connection, level int, kind, instance, origkind, or
 	//fmt.Printf("Kind:%s, Related Kind List 1:%v\n", kind, relatedKindList)
 	for _, relatedKind := range relatedKindList {
 		relStringListRelated := relationshipMap[relatedKind]
+		//fmt.Printf("RelStringListrelated:%v\n", relStringListRelated)
 		visited = findUpstreamRelatives(visited, level, relatedKind, kind, instance, namespace, relStringListRelated)
 	}
 	visited = findParentConnections(visited, level, kind, instance, namespace)
@@ -534,6 +535,7 @@ func searchSpecPropertyField(level int, kind, instance, namespace, lhs, rhs, tar
 		//fmt.Printf("ABC ABC: %v, %s", found, fieldValue)
 		if found {
 			for _, unstructuredObj := range rhsInstList {
+				//fmt.Printf(" 444 %s\n", unstructuredObj.GetName())
 				if rhs == "name" {
 					rhsInstanceName := unstructuredObj.GetName()
 					if fieldValue == rhsInstanceName {
@@ -781,7 +783,7 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 
 		lhsObj, err1 := getKubeObject(kind, instance, namespace, res)
 		if err1 != nil {
-			err = err1
+			return lhsInstList, err
 		} else {
 			lhsInstList = append(lhsInstList, &lhsObj)
 		}
