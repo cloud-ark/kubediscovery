@@ -55,7 +55,9 @@ func BuildCompositionTree(namespace string) {
 				namespace := topLevelObject.Namespace
 				level := 1
 				compositionTree := []CompositionTreeNode{}
+				//fmt.Printf("ResKind:%s ResName:%s\n", resourceKind, resourceName)
 				buildCompositions(resourceKind, resourceName, namespace, level, &compositionTree)
+				//fmt.Printf("CompositionTree:%v\n", compositionTree)
 				TotalClusterCompositions.storeCompositions(topLevelObject, resourceKind, resourceName, namespace, &compositionTree)
 			}
 			for _, resource := range topLevelMetaDataOwnerRefList {
@@ -231,6 +233,7 @@ func parseRels(annotations map[string]string, rel, relType string) []string {
 
 func getResourceKinds() []string {
 	resourceKindSlice := make([]string, 0)
+	//resourceKindSlice = append(resourceKindSlice, "MysqlService")
 	for key, _ := range compositionMap {
 		resourceKindSlice = append(resourceKindSlice, key)
 	}
@@ -238,6 +241,7 @@ func getResourceKinds() []string {
 }
 
 func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion,
+						 parentResKind, parentResName,
 						 namespace string) []MetaDataAndOwnerReferences {
 
 	metaDataAndOwnerReferenceList := []MetaDataAndOwnerReferences{}
@@ -264,11 +268,15 @@ func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion,
 
 	for _, unstructuredObj := range list.Items {
 		metaDataRef := MetaDataAndOwnerReferences{}
+		metaDataRef.OwnerReferenceKind = ""
+		metaDataRef.OwnerReferenceName = ""
 		ownerReferences := unstructuredObj.GetOwnerReferences()
 		for _, ownerReference := range ownerReferences {
-			metaDataRef.OwnerReferenceKind = ownerReference.Kind
-			metaDataRef.OwnerReferenceName = ownerReference.Name
-			metaDataRef.OwnerReferenceAPIVersion = ownerReference.APIVersion
+			if ownerReference.Kind == parentResKind && ownerReference.Name == parentResName {
+				metaDataRef.OwnerReferenceKind = ownerReference.Kind
+				metaDataRef.OwnerReferenceName = ownerReference.Name
+				metaDataRef.OwnerReferenceAPIVersion = ownerReference.APIVersion
+			}
 		}
 		metaDataRef.Namespace = unstructuredObj.GetNamespace()
 		metaDataRef.MetaDataName = unstructuredObj.GetName()
@@ -279,7 +287,9 @@ func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion,
 			metaDataRef.Status = phase
 		}
 
-		metaDataAndOwnerReferenceList = append(metaDataAndOwnerReferenceList, metaDataRef)
+		//if metaDataRef.OwnerReferenceKind != "" && metaDataRef.OwnerReferenceName != "" {
+			metaDataAndOwnerReferenceList = append(metaDataAndOwnerReferenceList, metaDataRef)
+		//}
 	}
 
 	return metaDataAndOwnerReferenceList
@@ -288,9 +298,13 @@ func getResourceMetaData(resourceKindPlural, resourceGroup, resourceApiVersion,
 func getTopLevelResourceMetaData(resourceKind, namespace string) []MetaDataAndOwnerReferences {
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(resourceKind)
 
+	parentResKind := ""
+	parentResName := ""
 	metaDataAndOwnerReferenceList := getResourceMetaData(resourceKindPlural,
 														 resourceGroup,
 														 resourceApiVersion,
+														 parentResKind,
+														 parentResName,
 														 namespace)
 	return metaDataAndOwnerReferenceList
 }
@@ -474,6 +488,8 @@ func buildCompositions(parentResourceKind string, parentResourceName string, par
 			metaDataAndOwnerReferenceList = getResourceMetaData(childKindPlural,
 																childResourceGroup,
 																childResourceApiVersion,
+																parentResourceKind,
+																parentResourceName,
 																parentNamespace)
 
 			childrenList := filterChildren(&metaDataAndOwnerReferenceList, parentResourceName)
