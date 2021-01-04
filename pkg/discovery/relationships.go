@@ -24,6 +24,12 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 	}*/
 
 	//fmt.Printf("Node - Level: %d, Kind:%s, instance:%s origkind:%s, originstance:%s relType:%s\n", level, kind, instance, origkind, originstance, relType)
+
+	ignored := checkIgnored(kind, instance)
+	if ignored {
+		return visited
+	}
+
 	if OutputFormat != "json" {
 		_ = makeTimestamp()
 		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
@@ -93,6 +99,7 @@ func findDownstreamRelatives(visited []Connection, level int, kind, instance, na
 			}
 			if relType == relTypeAnnotation {
 				targetInstance := "*"
+				//fmt.Printf("kind:%s instance:%s targetkind:%s targetInstance:%s\n", kind, instance, targetKind, targetInstance)
 				relativesNames, relDetail := searchAnnotations(level, kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
 				//fmt.Printf("FDSR Annotation:%v\n", relativesNames)				
 				visited = buildGraph(visited, level, kind, instance, relativesNames, targetKind, namespace, relType, relDetail)
@@ -100,6 +107,27 @@ func findDownstreamRelatives(visited []Connection, level int, kind, instance, na
 		}
 	}
 	return visited
+}
+
+func checkIgnored(kind, instance string) bool {
+	ignoredRelsString := strings.Split(RelsToIgnore, "=")
+	//fmt.Printf("IgnoredRelsString:%s\n", ignoredRelsString[1])
+	if len(ignoredRelsString) > 1 {
+		ignoredRels := strings.Split(ignoredRelsString[1], ",")
+		fqinstance := kind + ":" + instance
+		for _, rel := range ignoredRels {
+			//fmt.Printf("Ignored:%s, FQInstance:%s\n", rel, fqinstance)
+			parts := strings.Split(rel, ":")
+			if parts[1] == "*" {
+				if kind == parts[0] {
+					return true
+				}
+			} else if fqinstance == rel {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func findUpstreamRelatives(visited []Connection, level int, relatedKind, kind, instance, namespace string, relStringList []string) ([]Connection) {
@@ -182,7 +210,8 @@ func findCompositionConnections(visited []Connection, level int, kind, instance,
 
 	composition := TotalClusterCompositions.GetCompositions(kind, instance, namespace)
 	childrenConnections := make([]Connection, 0)
-
+	//fmt.Printf("Kind:%s Instance:%s\n", kind, instance)
+	//fmt.Printf("Composition:%v\n", composition)
 	for _, comp := range composition {
 		if comp.Level == 1 {
 			children := comp.Children
@@ -230,6 +259,8 @@ func findCompositionConnections(visited []Connection, level int, kind, instance,
 
 func findParentConnections(visited []Connection, level int, kind, instance, namespace string) []Connection {
 	ownerKind, ownerInstance := getOwnerDetail(kind, instance, namespace)
+	//fmt.Printf("Kind:%s Instance:%s\n", kind, instance)
+	//fmt.Printf("OKind:%s OInstance:%s\n", ownerKind, ownerInstance)
 	peer := Connection{
 				Kind: kind,
 				Name: instance,
@@ -280,6 +311,7 @@ func findParentConnections(visited []Connection, level int, kind, instance, name
 
 func findChildrenConnections(visited []Connection, level int, kind, instance, namespace string) []Connection {
 	relatedKindList := findChildKinds(kind)
+	//fmt.Printf("Child Kinds:%s\n", relatedKindList)
 	childs := make([]Connection,0)
 	peer := Connection{
 				Kind: kind,
@@ -414,10 +446,12 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
+	//fmt.Printf("RHSRes:%v\n", rhsRes)
 	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, relDetail
 	}
+	//fmt.Printf("RHSList:%v\n", rhsInstList)
 
 	for _, instanceObj := range lhsInstList {
 		//lhsContent := instanceObj.UnstructuredContent()
@@ -428,12 +462,17 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 			//fmt.Printf("RHS Name:%s\n", rhsName)
 		//rhsContent := unstructuredObj.UnstructuredContent()
 		//annotationMap, ok, _ := unstructured.NestedMap(rhsContent, "annotations")
+			//rhsKind := unstructuredObj.GetKind()
+			//fmt.Printf("RHSKind:%s\n", rhsKind)
+			lowercaseKind := strings.ToLower(kind)
+			fqvalue := lowercaseKind + "-" + lhsName
+			//fmt.Printf("fqvalue:%s\n", fqvalue)
 			annotations := unstructuredObj.GetAnnotations()
 		//fmt.Printf("AnnotationMap:%v\n", annotations)
 			for key, value := range annotations {
 				//fmt.Printf("Key:%s, AnnotationKey:%s, value:%s, lhsName:%s\n", key, annotationKey, value, lhsName)
 				if instance == "*" {
-					if key == annotationKey && (value == lhsName || strings.Contains(value, lhsName)) {
+					if key == annotationKey && (value == lhsName || (value == fqvalue) || strings.Contains(value, lhsName)) {
 						//rhsInstanceName := unstructuredObj.GetName()
 						//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
 						relDetail = annotationKey + "::" + annotationValue
@@ -455,7 +494,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 				} else {
 					//fmt.Printf("Value:%s\n", value)
 					//fmt.Printf("Instance:%s\n", instance)
-					if key == annotationKey && (value == instance || strings.Contains(value, instance)) {
+					if key == annotationKey && (value == instance || (value == fqvalue) || strings.Contains(value, instance)) {
 						rhsInstanceName := unstructuredObj.GetName()
 						//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
 						relDetail = annotationKey + "::" + annotationValue
@@ -633,12 +672,12 @@ func findFieldValue(lhsContent interface{}, specfield string) (string, bool) {
 	//fmt.Printf("FieldValue:%s\n", fieldValue)
 
 	// Handle default field values such as Pod.spec.serviceAccountName
-	if !found {
+	/*if !found {
 		if specfield == "serviceAccountName" {
 			fieldValue = "default"
 			found = true
 		}
-	}
+	}*/
 	return fieldValue, found
 }
 
@@ -747,7 +786,6 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 	lhsInstList := make([]*unstructured.Unstructured,0)
 	var err error
 	if instance == "*" {
-		/*
 		lhsInstances, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
 																		   		 	metav1.ListOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -756,12 +794,15 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				//panic(err)
 				return lhsInstList, err
 			}
-		}*/
+		}
 		
+		/* TODO: Reading from cache - needs more work. 
+		// Does not seem to discover all the relationships
 		lhsInstances, err := getKubeObjectList(kind, namespace, res)
 		if err != nil {
 			return lhsInstList, err
 		}
+		*/
 
 		for _, lhsObj := range lhsInstances.Items {
 			//lhsName := lhsObj.GetName()
@@ -770,7 +811,6 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 			lhsInstList = append(lhsInstList, lhsObjCopy)
 		}
 	} else {
-		/*
 		lhsObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(), instance,
 																		   	   metav1.GetOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -779,14 +819,18 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				//panic(err)
 				return lhsInstList, err
 			}
-		}*/
+		} else {
+			lhsInstList = append(lhsInstList, lhsObj)
+		}
 
+		/* TODO: Reading from cache. Needs more work
+		// Does not seem to discover all the relationships
 		lhsObj, err1 := getKubeObject(kind, instance, namespace, res)
 		if err1 != nil {
 			return lhsInstList, err
 		} else {
 			lhsInstList = append(lhsInstList, &lhsObj)
-		}
+		}*/
 	}
 	return lhsInstList, err
 }
@@ -813,7 +857,9 @@ func parseRelationship(relString string) (string, string, string, []string) {
 		lhs = lhsStringParts[len(lhsStringParts)-1]
 	}
 	if relType == relTypeAnnotation {
-		targetKind := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
+		targetKindString := strings.Split(strings.TrimSpace(parts[1]), ":")[1]
+		// resource/annotation-relationship: "on:MysqlCluster; Secret, key:meta.helm.sh/release-name, value:INSTANCE.metadata.name"
+		targetKinds := strings.Split(targetKindString, ";")
 		lhs = strings.Split(strings.TrimSpace(parts[2]), ":")[1]
 		rhsparts := strings.Split(strings.TrimSpace(parts[3]), ":")
 		if len(rhsparts) == 2 { // value:name
@@ -823,7 +869,11 @@ func parseRelationship(relString string) (string, string, string, []string) {
 			rhs = strings.ReplaceAll(rhs, "}", "")
 			rhs = strings.ReplaceAll(rhs, "]", "")
 		}
-		targetKindList = append(targetKindList, targetKind)
+		for _, targetKind := range targetKinds {
+			targetKind = strings.TrimSpace(targetKind)
+			targetKindList = append(targetKindList, targetKind)
+		}
+		//fmt.Printf("TargetKindList:%s\n", targetKindList)
 	}
 	if relType == relTypeOwnerReference {
 		targetKind := strings.Split(strings.TrimSpace(parts[1]), ":")[1]

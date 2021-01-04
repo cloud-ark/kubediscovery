@@ -54,6 +54,8 @@ func main() {
 			instance = os.Args[3]
 			namespace = os.Args[4]
 			discovery.OutputFormat = "default"
+
+			/*
 			if len(os.Args) == 7 {
 				discovery.OutputFormat = os.Args[6]
 			}
@@ -67,7 +69,33 @@ func main() {
 				discovery.OutputFormat = os.Args[6]
 			} else {
 				discovery.BuildConfig("")
+			}*/
+
+			discovery.RelsToIgnore = ""
+			kubeconfigpath := ""
+			for i, opt := range os.Args {
+				//fmt.Printf("Opt:%s\n", opt)
+				ignorefound := strings.Contains(opt, "ignore")
+				if ignorefound {
+					discovery.RelsToIgnore = opt
+				}
+				opformatfound := strings.Contains(opt, "-o")
+				if opformatfound {
+				    //parts = strings.Split(opt, "=")
+					discovery.OutputFormat = os.Args[i+1]
+				}
+				kubeconfigfound := strings.Contains(opt, "kubeconfig")
+				if kubeconfigfound {
+					kubeconfig := opt
+					kubeconfigparts := strings.Split(kubeconfig, "=")
+					kubeconfigpath = kubeconfigparts[1]
+					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)				
+				}
 			}
+			//fmt.Printf("O/P format:%s\n", discovery.OutputFormat)
+			//fmt.Printf("Kubeconfig path:%s\n", kubeconfigpath)
+			//fmt.Printf("IgnoreList:%s\n", discovery.RelsToIgnore)
+			discovery.BuildConfig(kubeconfigpath)
 
 			_ = discovery.ReadKinds(kind)
 			exists := discovery.CheckExistence(kind, instance, namespace)

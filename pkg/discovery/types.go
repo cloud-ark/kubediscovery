@@ -137,6 +137,7 @@ var (
 	OrigKind, OrigName, OrigNamespace string
 	OrigLevel int
 	OutputFormat string
+	RelsToIgnore string
 )
 
 func init() {
