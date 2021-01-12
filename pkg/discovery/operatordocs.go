@@ -73,7 +73,7 @@ func getCRDDetails(crdDetailsString string) (string, string, string, []string, s
 }
 
 func GetUsageDetails(customResourceKind string) (string) {
-	var manPage, usageDetailsData, subresources, relationships string
+	var manPage, usageDetailsData, relationships, group, version string
 	crdClient, err1 := apiextensionsclientset.NewForConfig(cfg)
 	if err1 != nil {
 		fmt.Errorf("Error:%s\n", err1)
@@ -96,8 +96,11 @@ func GetUsageDetails(customResourceKind string) (string) {
 		}
 		if customResourceKind != "" {
 			if customResourceKind == crdObj.Spec.Names.Kind {
+				//fmt.Printf("%v\n", crdObj)
 				objectMeta := crdObj.ObjectMeta
 				annotations := objectMeta.GetAnnotations()
+				group = crdObj.Spec.Group
+				version = crdObj.Spec.Version
 				usageDetailsCMapName := annotations[USAGE_ANNOTATION]
 				//fmt.Printf("usageDetailsCMapName:%s\n", usageDetailsCMapName)
 				if usageDetailsCMapName != "" {
@@ -107,7 +110,7 @@ func GetUsageDetails(customResourceKind string) (string) {
 						usageDetailsData = "Could not find usage details data."
 					}
 				}
-				subresources = annotations[COMPOSITION_ANNOTATION]
+				//subresources := annotations[COMPOSITION_ANNOTATION]
 				allRels := getAllRelationships(annotations)
 				relationships = ""
 				indentation := "    "
@@ -118,6 +121,13 @@ func GetUsageDetails(customResourceKind string) (string) {
 		}
 	}
 
+    manPage = "KIND:\t" + customResourceKind + "\n"
+    manPage = manPage + "GROUP:\t" + group + "\n"
+    manPage = manPage + "VERSION:\t" + version + "\n\n"
+    manPage = manPage + "DESCRIPTION:\n"
+    manPage = manPage + usageDetailsData + "\n\n"
+
+/*
 	manPage = "NAME\n"
 	manPage = manPage + "=====\n"
 	manPage = manPage + "    " + customResourceKind + "\n\n"
@@ -133,7 +143,7 @@ func GetUsageDetails(customResourceKind string) (string) {
 	manPage = manPage + "Usage Guidelines\n"
 	manPage = manPage + "=================\n"
 	manPage = manPage + usageDetailsData + "\n\n"
-
+*/
 	return manPage
 }
 
