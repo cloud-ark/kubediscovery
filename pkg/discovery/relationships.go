@@ -32,8 +32,15 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 
 	if OutputFormat != "json" {
 		_ = makeTimestamp()
-		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s\n", level, kind, instance)
+		fmt.Printf("Discovering node - Level: %d, Kind:%s, instance:%s namespace:%s\n", level, kind, instance, namespace)
 	} 
+
+	if kind == "Namespace" {
+		NamespaceToSearch = instance
+		//fmt.Printf("NamespaceToSearch:%s\n", NamespaceToSearch)
+		namespace = instance
+	}
+
 			inputInstance := Connection{
 			Name: instance,
 			Kind: kind,
@@ -99,7 +106,7 @@ func findDownstreamRelatives(visited []Connection, level int, kind, instance, na
 			}
 			if relType == relTypeAnnotation {
 				targetInstance := "*"
-				//fmt.Printf("kind:%s instance:%s targetkind:%s targetInstance:%s\n", kind, instance, targetKind, targetInstance)
+				//fmt.Printf("kind:%s instance:%s targetkind:%s targetInstance:%s ns:%s\n", kind, instance, targetKind, targetInstance, namespace)
 				relativesNames, relDetail := searchAnnotations(level, kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
 				//fmt.Printf("FDSR Annotation:%v\n", relativesNames)				
 				visited = buildGraph(visited, level, kind, instance, relativesNames, targetKind, namespace, relType, relDetail)
@@ -245,6 +252,9 @@ func findCompositionConnections(visited []Connection, level int, kind, instance,
 				relType := relTypeOwnerReference
 				//fmt.Printf("Conn.Kind:%s Conn.Name:%s kind:%s instance:%s\n", conn.Kind, conn.Name, kind, instance)
 				TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
+				if NamespaceToSearch != "" {
+					namespace = NamespaceToSearch
+				}
 				visited = GetRelatives(visited, level, conn.Kind, conn.Name, kind, instance, namespace, relType)
 		}
 	}
@@ -298,6 +308,9 @@ func findParentConnections(visited []Connection, level int, kind, instance, name
 				relType := relTypeOwnerReference
 				//fmt.Printf("ABC:%v\n", conn)
 				TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
+				if NamespaceToSearch != "" {
+					namespace = NamespaceToSearch
+				}
 				visited = GetRelatives(visited, level, conn.Kind, conn.Name, kind, instance, namespace, relType)
 			}
 		}
@@ -367,6 +380,9 @@ func findChildrenConnections(visited []Connection, level int, kind, instance, na
 			if conn.Kind != "" && conn.Name != "" {
 				//fmt.Printf("ABC:%v\n", conn)
 				TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
+				if NamespaceToSearch != "" {
+					namespace = NamespaceToSearch
+				}
 				visited = GetRelatives(visited, level, conn.Kind, conn.Name, kind, instance, namespace, relType)
 			}
 		}
@@ -383,6 +399,9 @@ func searchNextLevel(visited []Connection, level int, relativeNames []Connection
 	for _, relative := range relativeNames {
 		relativeName := relative.Name
 		TotalClusterConnections = AppendConnections(TotalClusterConnections, relative)
+		if NamespaceToSearch != "" {
+			namespace = NamespaceToSearch
+		}
 		visited = GetRelatives(visited, level, targetKind, relativeName, kind, instance, namespace, relType)
 	}
 	return visited
@@ -437,7 +456,11 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 									   Version: lhsResApiVersion,
 									   Resource: lhsResKindPlural}
 	//fmt.Printf("%v\n", lhsRes)
-	lhsInstList, err := getObjects(kind, instance, namespace, lhsRes, dynamicClient)
+	lhsNamespace := namespace
+	if kind == OriginalInputKind && instance == OriginalInputInstance {
+		lhsNamespace = OriginalInputNamespace
+	}
+	lhsInstList, err := getObjects(kind, instance, lhsNamespace, lhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, relDetail
 	}
@@ -447,7 +470,11 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
 	//fmt.Printf("RHSRes:%v\n", rhsRes)
-	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
+	rhsNamespace := namespace
+	if NamespaceToSearch != "" {
+		rhsNamespace = NamespaceToSearch
+	}
+	rhsInstList, err := getObjects(targetKind, targetInstance, rhsNamespace, rhsRes, dynamicClient)
 	if err != nil {
 		return relativesNames, relDetail
 	}
@@ -460,21 +487,21 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 		for _, unstructuredObj := range rhsInstList {
 			//rhsName := unstructuredObj.GetName()
 			//fmt.Printf("RHS Name:%s\n", rhsName)
-		//rhsContent := unstructuredObj.UnstructuredContent()
-		//annotationMap, ok, _ := unstructured.NestedMap(rhsContent, "annotations")
+			//rhsContent := unstructuredObj.UnstructuredContent()
+			//annotationMap, ok, _ := unstructured.NestedMap(rhsContent, "annotations")
 			//rhsKind := unstructuredObj.GetKind()
 			//fmt.Printf("RHSKind:%s\n", rhsKind)
 			lowercaseKind := strings.ToLower(kind)
 			fqvalue := lowercaseKind + "-" + lhsName
 			//fmt.Printf("fqvalue:%s\n", fqvalue)
 			annotations := unstructuredObj.GetAnnotations()
-		//fmt.Printf("AnnotationMap:%v\n", annotations)
+			//fmt.Printf("AnnotationMap:%v\n", annotations)
 			for key, value := range annotations {
 				//fmt.Printf("Key:%s, AnnotationKey:%s, value:%s, lhsName:%s\n", key, annotationKey, value, lhsName)
 				if instance == "*" {
 					if key == annotationKey && (value == lhsName || (value == fqvalue) || strings.Contains(value, lhsName)) {
 						//rhsInstanceName := unstructuredObj.GetName()
-						//fmt.Printf("RHS InstanceName:%s\n", rhsInstanceName)
+						//fmt.Printf("RHSKIND:%s RHS InstanceName:%s\n", targetKind, rhsInstanceName)
 						relDetail = annotationKey + "::" + annotationValue
 						conn := Connection{
 							Level: level,
@@ -556,16 +583,33 @@ func searchSpecPropertyField(level int, kind, instance, namespace, lhs, rhs, tar
 	rhsRes := schema.GroupVersionResource{Group: rhsResGroup,
 									   Version: rhsResApiVersion,
 									   Resource: rhsResKindPlural}
-	rhsInstList, err := getObjects(targetKind, targetInstance, namespace, rhsRes, dynamicClient)
+	rhsNamespace := namespace
+	if targetKind == "Namespace" {
+		rhsNamespace = OriginalInputNamespace
+	}
+	//fmt.Printf("TargetKind:%s, TargetInstance:%s rhsNamespace:%s\n", targetKind, targetInstance, rhsNamespace)
+	rhsInstList, err := getObjects(targetKind, targetInstance, rhsNamespace, rhsRes, dynamicClient)
+	//fmt.Printf("RhsInstList:%v\n", rhsInstList)
 	if err != nil {
+		//fmt.Printf("Error:%v\n", err)
 		return relativesNames, propertyNameValue
 	}
-
+	//fmt.Printf("LHSObj:%v\n", lhsInstList)
+	//fmt.Printf("LHSKind:%s lhs:%s namespace:%s\n", kind, lhs, namespace)
 	for _, instanceObj := range lhsInstList {
 		lhsContent := instanceObj.UnstructuredContent()
 		lhsName := instanceObj.GetName()
 		//fmt.Printf("LHSContent:%v\n", lhsContent)
-		fieldValue, found := findFieldValue(lhsContent, lhs)
+		//fmt.Printf("LHSName:%s\n",lhsName)
+		var fieldValue string
+		var found bool
+		if lhs == "namespace" {
+			fieldValue = instanceObj.GetNamespace()
+			//fmt.Printf("FieldValue:%s\n", fieldValue)
+			found = true
+		} else {
+			fieldValue, found = findFieldValue(lhsContent, lhs)
+		}
 		//fieldValue, found, err := unstructured.NestedString(lhsContent, "spec", lhs)
 		//fmt.Printf("FieldValue:%s, found:%v, Error:%v", fieldValue, found, err)
 		//if err != nil || !found {
@@ -819,7 +863,9 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				//panic(err)
 				return lhsInstList, err
 			}
-		} else {
+		}  
+
+		if lhsObj != nil {
 			lhsInstList = append(lhsInstList, lhsObj)
 		}
 

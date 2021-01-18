@@ -53,6 +53,9 @@ func main() {
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
+			discovery.OriginalInputNamespace = namespace
+			discovery.OriginalInputKind = kind
+			discovery.OriginalInputInstance = instance
 			discovery.OutputFormat = "default"
 
 			/*
