@@ -124,6 +124,7 @@ var (
 	DAEMONSET    string
 	RC           string
 	PDB 		 string
+	NAMESPACE    string
 
 	relTypeLabel string
 	relTypeSpecProperty string
@@ -138,10 +139,17 @@ var (
 	OrigLevel int
 	OutputFormat string
 	RelsToIgnore string
+
+	NamespaceToSearch string
+	OriginalInputNamespace string
+	OriginalInputKind string
+	OriginalInputInstance string
 )
 
 func init() {
 	TotalClusterCompositions = ClusterCompositions{}
+
+	NamespaceToSearch = ""
 
 	DEPLOYMENT = "Deployment"
 	REPLICA_SET = "ReplicaSet"
@@ -158,6 +166,7 @@ func init() {
 	RC = "ReplicationController"
 	PDB = "PodDisruptionBudget"
 	SERVICE_ACCOUNT = "ServiceAccount"
+	NAMESPACE = "Namespace"
 
 	relTypeLabel = "label"
 	relTypeSpecProperty = "specproperty"
@@ -226,15 +235,22 @@ func init() {
 	podRel0 := "specproperty, on:INSTANCE.spec.env, value:Service.spec.metadata.name"
 	podRel1 := "specproperty, on:INSTANCE.spec.volumes.persistentVolumeClaim.claimName, value:PersistentVolumeClaim.spec.metadata.name"
 	podRel2 := "specproperty, on:INSTANCE.spec.serviceAccountName, value:ServiceAccount.metadata.name"
+	podRel3 := "specproperty, on:INSTANCE.metadata.namespace, value:Namespace.metadata.name"	
 	podRelationships = append(podRelationships, podRel0)
 	podRelationships = append(podRelationships, podRel1)
 	podRelationships = append(podRelationships, podRel2)
+	podRelationships = append(podRelationships, podRel3)
 	relationshipMap[POD] = podRelationships
 
 	KindPluralMap[SERVICE_ACCOUNT] = "serviceaccounts"
 	kindVersionMap[SERVICE_ACCOUNT] = "api/v1"
 	kindGroupMap[SERVICE_ACCOUNT] = ""
 	compositionMap[SERVICE_ACCOUNT] = []string{}
+
+	KindPluralMap[NAMESPACE] = "namespaces"
+	kindVersionMap[NAMESPACE] = "v1"
+	kindGroupMap[NAMESPACE] = ""
+	compositionMap[NAMESPACE] = []string{}
 
 	KindPluralMap[SERVICE] = "services"
 	kindVersionMap[SERVICE] = "api/v1"
@@ -255,7 +271,7 @@ func init() {
 	relationshipMap[INGRESS] = ingressRelationships
 
 	KindPluralMap[SECRET] = "secrets"
-	kindVersionMap[SECRET] = "api/v1"
+	kindVersionMap[SECRET] = "v1"
 	kindGroupMap[SECRET] = ""
 	compositionMap[SECRET] = []string{}
 
