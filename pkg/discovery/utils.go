@@ -17,6 +17,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes"
 )
 
 var (
@@ -375,6 +376,20 @@ func findChildKinds(kind string) []string {
 	return childKinds
 }
 
+func GetCAdvisorMetrics(nodeName string) string {
+	
+	// source: https://github.com/kubernetes/client-go/issues/716
+	clientset, err := kubernetes.NewForConfig(cfg)
+	request := clientset.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("metrics/cadvisor")
+	responseRawArrayOfBytes, err := request.DoRaw(context.TODO())
+	if err != nil {
+		return err.Error()
+	}
+	responseToReturn := string(responseRawArrayOfBytes)
+	fmt.Printf(responseToReturn)
+	return responseToReturn
+}
+
 func deepCopy(input Connection) Connection {
 	var output Connection
 	output.Peer = input.Peer
@@ -416,6 +431,7 @@ func printConnectionsJSON(connections []Connection) {
 			PeerName: conn.Peer.Name,
 			PeerNamespace: conn.Peer.Namespace,
 			RelationType: conn.RelationType,
+			RelationDetails: conn.RelationDetails,
 		}
 		connectionsOutput = append(connectionsOutput, op)
 	}

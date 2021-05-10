@@ -76,23 +76,29 @@ func main() {
 
 			discovery.RelsToIgnore = ""
 			kubeconfigpath := ""
-			for i, opt := range os.Args {
+			for _, opt := range os.Args {
 				//fmt.Printf("Opt:%s\n", opt)
-				ignorefound := strings.Contains(opt, "ignore")
-				if ignorefound {
-					discovery.RelsToIgnore = opt
-				}
-				opformatfound := strings.Contains(opt, "-o")
-				if opformatfound {
-				    //parts = strings.Split(opt, "=")
-					discovery.OutputFormat = os.Args[i+1]
-				}
-				kubeconfigfound := strings.Contains(opt, "kubeconfig")
-				if kubeconfigfound {
-					kubeconfig := opt
-					kubeconfigparts := strings.Split(kubeconfig, "=")
-					kubeconfigpath = kubeconfigparts[1]
-					//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)				
+				parts := strings.Split(opt, "=")
+				if len(parts) == 2 {
+					option := parts[0]
+					optVal := parts[1]
+					ignorefound := strings.EqualFold(option, "--ignore")
+					if ignorefound {
+						discovery.RelsToIgnore = optVal
+					}
+					opformatfound := strings.EqualFold(option, "--output")
+					if opformatfound {
+					    //parts = strings.Split(opt, "=")
+						discovery.OutputFormat = optVal
+					}
+					kubeconfigfound := strings.EqualFold(option, "--kubeconfig")
+					if kubeconfigfound {
+						kubeconfigpath = optVal
+						/*kubeconfig := opt
+						kubeconfigparts := strings.Split(kubeconfig, "=")
+						kubeconfigpath = kubeconfigparts[1]
+						//fmt.Printf("Kubeconfig Path:%s\n", kubeconfigpath)*/			
+					}
 				}
 			}
 			//fmt.Printf("O/P format:%s\n", discovery.OutputFormat)
@@ -148,6 +154,13 @@ func main() {
 		if commandType != "composition" && commandType != "connections" && commandType != "man" {
 			fmt.Printf("Unknown command specified:%s\n", commandType)
 			fmt.Printf("Allowed values: [composition, connections, man]\n")
+		}
+		if commandType == "networkmetrics" {
+			discovery.BuildConfig("")
+			nodeName := os.Args[2]
+			cAdvisorMetrics := discovery.GetCAdvisorMetrics(nodeName)
+			fmt.Printf("-----\n")
+			fmt.Printf(cAdvisorMetrics)
 		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")
