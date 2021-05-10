@@ -117,10 +117,10 @@ func findDownstreamRelatives(visited []Connection, level int, kind, instance, na
 }
 
 func checkIgnored(kind, instance string) bool {
-	ignoredRelsString := strings.Split(RelsToIgnore, "=")
+	//ignoredRelsString := strings.Split(RelsToIgnore, "=")
 	//fmt.Printf("IgnoredRelsString:%s\n", ignoredRelsString[1])
-	if len(ignoredRelsString) > 1 {
-		ignoredRels := strings.Split(ignoredRelsString[1], ",")
+	//if len(ignoredRelsString) > 1 {
+		ignoredRels := strings.Split(RelsToIgnore, ",")
 		fqinstance := kind + ":" + instance
 		for _, rel := range ignoredRels {
 			//fmt.Printf("Ignored:%s, FQInstance:%s\n", rel, fqinstance)
@@ -133,7 +133,7 @@ func checkIgnored(kind, instance string) bool {
 				return true
 			}
 		}
-	}
+	//}
 	return false
 }
 
