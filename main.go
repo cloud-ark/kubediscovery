@@ -20,6 +20,13 @@ func main() {
 		// kubediscovery composition Moodle moodle1 default
 		// kubediscovery man Moodle 
 		commandType := os.Args[1]
+		if _, exists := discovery.ALLOWED_COMMANDS[strings.TrimSpace(commandType)]; !exists {
+			fmt.Printf("Unknown command specified:%s\n", commandType)
+			fmt.Printf("Allowed values:\n")
+			for k, _ := range discovery.ALLOWED_COMMANDS {
+				fmt.Printf("%s ", k)
+			}
+		}
 		if commandType == "composition" {
 			if len(os.Args) < 5 {
 				panic("Not enough arguments: ./kubediscovery composition <kind> <instance> <namespace>")
@@ -151,16 +158,19 @@ func main() {
 			manPage := apiserver.GetManPage(kind)
 			fmt.Printf("%s\n", manPage)
 		}
-		if commandType != "composition" && commandType != "connections" && commandType != "man" {
-			fmt.Printf("Unknown command specified:%s\n", commandType)
-			fmt.Printf("Allowed values: [composition, connections, man]\n")
-		}
 		if commandType == "networkmetrics" {
 			discovery.BuildConfig("")
 			nodeName := os.Args[2]
 			cAdvisorMetrics := discovery.GetCAdvisorMetrics(nodeName)
 			fmt.Printf("-----\n")
 			fmt.Printf(cAdvisorMetrics)
+		}
+		if commandType == "podmetrics" {
+			discovery.BuildConfig("")
+			nodeName := os.Args[2]
+			podMetrics := discovery.GetKubeletMetrics(nodeName)
+			//fmt.Printf("-----\n")
+			fmt.Printf(podMetrics)
 		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")

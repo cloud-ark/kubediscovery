@@ -91,6 +91,8 @@ type KubeObjectCacheEntry struct {
 
 var (
 
+	ALLOWED_COMMANDS map[string]string
+
 	USAGE_ANNOTATION string
 	COMPOSITION_ANNOTATION string
 	ANNOTATION_REL_ANNOTATION string
@@ -148,6 +150,14 @@ var (
 )
 
 func init() {
+
+	ALLOWED_COMMANDS = make(map[string]string,0)
+	ALLOWED_COMMANDS["composition"] = "composition"
+	ALLOWED_COMMANDS["connections"] = "connections"
+	ALLOWED_COMMANDS["man"] = "man"
+	ALLOWED_COMMANDS["networkmetrics"] = "networkmetrics"
+	ALLOWED_COMMANDS["podmetrics"] = "podmetrics"
+
 	TotalClusterCompositions = ClusterCompositions{}
 
 	NamespaceToSearch = ""
