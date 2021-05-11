@@ -377,7 +377,6 @@ func findChildKinds(kind string) []string {
 }
 
 func GetCAdvisorMetrics(nodeName string) string {
-	
 	// source: https://github.com/kubernetes/client-go/issues/716
 	clientset, err := kubernetes.NewForConfig(cfg)
 	request := clientset.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("metrics/cadvisor")
@@ -387,6 +386,19 @@ func GetCAdvisorMetrics(nodeName string) string {
 	}
 	responseToReturn := string(responseRawArrayOfBytes)
 	fmt.Printf(responseToReturn)
+	return responseToReturn
+}
+
+func GetKubeletMetrics(nodeName string) string {
+	// source: https://github.com/kubernetes/client-go/issues/716
+	clientset, err := kubernetes.NewForConfig(cfg)
+	request := clientset.CoreV1().RESTClient().Get().Resource("nodes").Name(nodeName).SubResource("proxy").Suffix("stats/summary")
+	responseRawArrayOfBytes, err := request.DoRaw(context.TODO())
+	if err != nil {
+		return err.Error()
+	}
+	responseToReturn := string(responseRawArrayOfBytes)
+	//fmt.Printf(responseToReturn)
 	return responseToReturn
 }
 
