@@ -10,15 +10,32 @@ import (
 //	"github.com/cloud-ark/kubediscovery/pkg/cmd/server"
 	"github.com/cloud-ark/kubediscovery/pkg/discovery"
 	"github.com/cloud-ark/kubediscovery/pkg/apiserver"
-)
+	"runtime/pprof"
+	"flag"
+	"log"
+)	
+
+var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
 
 func main() {
+	flag.Parse()
+	//fmt.Printf("CPU Profile flag:%s\n", *cpuprofile)
+	if *cpuprofile != "" {
+		//fmt.Printf("Profile file provided\ng")
+        f, err := os.Create(*cpuprofile)
+        if err != nil {
+            log.Fatal(err)
+        }
+        pprof.StartCPUProfile(f)
+        defer pprof.StopCPUProfile()
+    }
 	//if len(os.Args) == 7  || len(os.Args) == 5 || len(os.Args) == 3 {
 	if len(os.Args) >= 2 {
 		var kind, instance, namespace string
 		// kubediscovery connections Moodle moodle1 default -o flat
 		// kubediscovery composition Moodle moodle1 default
-		// kubediscovery man Moodle 
+		// kubediscovery man Moodle
+		// change to os.Args[2] when collecting profiling data
 		commandType := os.Args[1]
 		if _, exists := discovery.ALLOWED_COMMANDS[strings.TrimSpace(commandType)]; !exists {
 			fmt.Printf("Unknown command specified:%s\n", commandType)
@@ -57,6 +74,7 @@ func main() {
 			if len(os.Args) < 5  {
 				panic("Not enough arguments:./kubediscovery connections <kind> <instance> <namespace>")
 			}
+			// change to 3, 4, 5 when collecting profiling data
 			kind = os.Args[2]
 			instance = os.Args[3]
 			namespace = os.Args[4]
@@ -116,6 +134,9 @@ func main() {
 			_ = discovery.ReadKinds(kind)
 			exists := discovery.CheckExistence(kind, instance, namespace)
 			if exists {
+				// Prefetching does not seem to improve performance.
+				// In fact, it degrades performance by few milliseconds.
+				// So turning pre-fetching off
 				//discovery.FetchGVKs(namespace)
 				level := 0
 				visited := make([]discovery.Connection, 0)
@@ -124,7 +145,8 @@ func main() {
 				discovery.OrigName = instance
 				discovery.OrigNamespace = namespace
 				discovery.OrigLevel = level
-				discovery.BuildCompositionTree(namespace)
+				// No need to build CompositionTree as we are searching Parent relationships
+				//discovery.BuildCompositionTree(namespace)
 				root := discovery.Connection{
 					Name: instance,
 					Kind: kind,

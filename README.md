@@ -7,6 +7,14 @@ Kubediscovery enables discovering dynamic information about Kubernetes resources
 Kubediscovery's initial implementation was as a Kubernetes Aggregated API Server. 
 You can read about that approach in [this blog post](https://medium.com/@cloudark/kubediscovery-aggregated-api-server-to-learn-more-about-kubernetes-custom-resources-18202a1c4aef). When building this Aggregated API server based implementation we tried several approaches. You can read about that experience [here](https://medium.com/@cloudark/our-journey-in-building-a-kubernetes-aggregated-api-server-29a4f9c1de22).
 
+## Profiling
+
+- Modify main.go to adjust to profiling flag input
+- go build .
+- ./kubediscovery -cpuprofile=abc.prof connections Pod etcd-minikube kube-system
+- go tool pprof kubediscovery abc.prof
+- top5 -cum
+- https://blog.golang.org/pprof
 
 ## How it works?
 
