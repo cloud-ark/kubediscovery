@@ -125,12 +125,14 @@ func checkIgnored(kind, instance string) bool {
 		for _, rel := range ignoredRels {
 			//fmt.Printf("Ignored:%s, FQInstance:%s\n", rel, fqinstance)
 			parts := strings.Split(rel, ":")
-			if parts[1] == "*" {
-				if kind == parts[0] {
+			if len(parts) > 1 {
+				if parts[1] == "*" {
+					if kind == parts[0] {
+						return true
+					}
+				} else if fqinstance == rel {
 					return true
 				}
-			} else if fqinstance == rel {
-				return true
 			}
 		}
 	//}
@@ -830,6 +832,9 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 	lhsInstList := make([]*unstructured.Unstructured,0)
 	var err error
 	if instance == "*" {
+		/*
+		// Non-caching approach to list objects
+		fmt.Printf("Kind:%s Instance:%s NS:%s Res:%v\n", kind, instance, namespace, res)
 		lhsInstances, err := dynamicClient.Resource(res).Namespace(namespace).List(context.TODO(),
 																		   		 	metav1.ListOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -838,15 +843,17 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				//panic(err)
 				return lhsInstList, err
 			}
-		}
+		}*/
 		
-		/* TODO: Reading from cache - needs more work. 
+		// TODO: Reading from cache - needs more work. 
 		// Does not seem to discover all the relationships
+		// Update (May 13, 2021):
+		// It does look like we are able to discover all relationships.
+		// So turning caching on.
 		lhsInstances, err := getKubeObjectList(kind, namespace, res)
 		if err != nil {
 			return lhsInstList, err
 		}
-		*/
 
 		for _, lhsObj := range lhsInstances.Items {
 			//lhsName := lhsObj.GetName()
@@ -855,6 +862,8 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 			lhsInstList = append(lhsInstList, lhsObjCopy)
 		}
 	} else {
+		/*
+		// Non-caching approach to query objects
 		lhsObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(), instance,
 																		   	   metav1.GetOptions{})
 		if err != nil { // Check if this is a non-namespaced resource
@@ -864,19 +873,22 @@ func getObjects(kind, instance, namespace string, res schema.GroupVersionResourc
 				return lhsInstList, err
 			}
 		}  
-
 		if lhsObj != nil {
 			lhsInstList = append(lhsInstList, lhsObj)
 		}
+		*/
 
-		/* TODO: Reading from cache. Needs more work
+		// TODO: Reading from cache. Needs more work
 		// Does not seem to discover all the relationships
+		// Update (May 13, 2021):
+		// It does look like we are able to discover all relationships.
+		// So turning caching on.
 		lhsObj, err1 := getKubeObject(kind, instance, namespace, res)
 		if err1 != nil {
 			return lhsInstList, err
 		} else {
 			lhsInstList = append(lhsInstList, &lhsObj)
-		}*/
+		}
 	}
 	return lhsInstList, err
 }
@@ -931,7 +943,6 @@ func parseRelationship(relString string) (string, string, string, []string) {
 
 func getLabels(kind, instance, namespace string) map[string]string {
 	labelMap := make(map[string]string)
-	dynamicClient, err := getDynamicClient()
 	if err != nil {
 		//fmt.Printf(err.Error())
 		return labelMap
@@ -941,11 +952,14 @@ func getLabels(kind, instance, namespace string) map[string]string {
 	res := schema.GroupVersionResource{Group: resourceGroup,
 									   Version: resourceApiVersion,
 									   Resource: resourceKindPlural}
+	// Direct call
+	/*dynamicClient, err := getDynamicClient()
 	instanceObj, err := dynamicClient.Resource(res).Namespace(namespace).Get(context.TODO(),
 																			 instance,
 																	   		 metav1.GetOptions{})
-
-	//instanceObj, err := getKubeObject(kind, instance, namespace, res)
+	*/
+	// (May 13, 2021): Look up from cache
+	instanceObj, err := getKubeObject(kind, instance, namespace, res)
 	if err != nil {
 		//fmt.Printf("ABC\n")
 		//fmt.Printf(err.Error())

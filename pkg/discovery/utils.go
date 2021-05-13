@@ -85,7 +85,7 @@ func getDynamicClient() (dynamic.Interface, error) {
 }
 
 func FetchGVKs(namespace string) {
-	kindPrefetchList := [...]string{"Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Service", "ServiceAccount", "Pod"}
+	kindPrefetchList := [...]string{"Deployment", "StatefulSet", "DaemonSet", "ReplicaSet", "Service", "ServiceAccount", "Pod", "PersistentVolume", "PersistentVolumeClaim","Secret"}
 	for _, k := range kindPrefetchList {
 		wg.Add(1)
 		fmt.Printf("Kind:%s\n", k)
