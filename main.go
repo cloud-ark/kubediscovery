@@ -145,8 +145,8 @@ func main() {
 				discovery.OrigName = instance
 				discovery.OrigNamespace = namespace
 				discovery.OrigLevel = level
-				// No need to build CompositionTree as we are searching Parent relationships
-				//discovery.BuildCompositionTree(namespace)
+				// Build the composition tree
+				discovery.BuildCompositionTree(namespace)
 				root := discovery.Connection{
 					Name: instance,
 					Kind: kind,
