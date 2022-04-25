@@ -172,11 +172,22 @@ func main() {
 			}
 		}
 		if commandType == "man" {
-			discovery.BuildConfig("")
-			if len(os.Args) != 3 {
-				panic("Not enough arguments:./kubediscovery man <kind>.")
-			}
+
+			/*if len(os.Args) < 4 {
+				panic("Not enough arguments:./kubediscovery man <kind> --kubeconfig=<Full path to kubeconfig>")
+			}*/
+
 			kind := os.Args[2]
+			kubeconfig1 := os.Args[3]
+			parts := strings.Split(kubeconfig1, "=")
+
+			if len(parts) == 2 && parts[1] != "" {
+				trimmedKubeconfig := strings.TrimSpace(parts[1])
+				discovery.BuildConfig(trimmedKubeconfig)
+			} else {
+				discovery.BuildConfig("")
+			}
+
 			manPage := apiserver.GetManPage(kind)
 			fmt.Printf("%s\n", manPage)
 		}

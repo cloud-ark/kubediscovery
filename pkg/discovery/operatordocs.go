@@ -277,13 +277,6 @@ func GetOpenAPISpec_prev(customResourceKind string) string {
 
 func readConfigMap(implementationDetailsString string) (string, error) {
 
-//	cfg, err := rest.InClusterConfig()
-	cfg, err = BuildConfig("")
-	if err != nil {
-		fmt.Printf("Error:%s\n", err.Error())
-		return "", err
-	}
-
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		fmt.Printf("Error:%s\n", err.Error())
