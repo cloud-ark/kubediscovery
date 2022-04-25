@@ -53,6 +53,13 @@ func homeDir() string {
 }
 
 func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
+	if yyy, err := os.Stat(kubeconfigpath); err != nil {
+		fmt.Printf("YYY:%v\n",yyy)
+		fmt.Printf("Kubeconfigpath:%s\n", kubeconfigpath)
+		fmt.Printf("Error:%v\n",err)
+		panic(err)
+	}
+
 	if _, err := os.Stat(kubeconfigpath); err == nil {
 		cfg, err = clientcmd.BuildConfigFromFlags("", kubeconfigpath)
 		if err != nil {
