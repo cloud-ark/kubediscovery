@@ -72,7 +72,7 @@ func getCRDDetails(crdDetailsString string) (string, string, string, []string, s
 	return kind, plural, endpoint, composition, implementationChoicesCMapName, usageCMapName, openapiSpecCMapName
 }
 
-func GetUsageDetails(customResourceKind string) (string) {
+func GetUsageDetails(customResourceKind string, namespace string) (string) {
 	var manPage, usageDetailsData, relationships, group, version string
 	crdClient, err1 := apiextensionsclientset.NewForConfig(cfg)
 	if err1 != nil {
@@ -104,7 +104,7 @@ func GetUsageDetails(customResourceKind string) (string) {
 				usageDetailsCMapName := annotations[USAGE_ANNOTATION]
 				//fmt.Printf("usageDetailsCMapName:%s\n", usageDetailsCMapName)
 				if usageDetailsCMapName != "" {
-					usageDetailsData, err = readConfigMap(usageDetailsCMapName)
+					usageDetailsData, err = readConfigMap(usageDetailsCMapName, namespace)
 					if err != nil {
 						fmt.Printf("Error:%s\n", err.Error())
 						usageDetailsData = "Could not find usage details data."
@@ -165,7 +165,7 @@ func GetUsageDetails1(customResourceKind string) (string, error) {
 		kind, _, _, _, _, usageDetailsCMapName, _ = getCRDDetails(crdDetailsString)
 
 		if kind == customResourceKind {
-			usageDetailsData, err = readConfigMap(usageDetailsCMapName)
+			usageDetailsData, err = readConfigMap(usageDetailsCMapName,"default")
 			if err != nil {
 				fmt.Printf("Error:%s\n", err.Error())
 				usageDetailsData = "Could not find usage details data."
@@ -196,7 +196,7 @@ func GetImplementationDetails(customResourceKind string) (string, error) {
 		fmt.Printf(":::: Implementation Details CMap:%s ::::", implementationDetailsCMapName)
 
 		if kind == customResourceKind {
-			implementationDetailsData, err = readConfigMap(implementationDetailsCMapName)
+			implementationDetailsData, err = readConfigMap(implementationDetailsCMapName, "default")
 			if err != nil {
 				fmt.Printf("Error:%s\n", err.Error())
 				implementationDetailsData = "Could not find implementation details data."
@@ -227,7 +227,7 @@ func GetOpenAPISpec(customResourceKind string) (string, error) {
 		kind, _, _, _, _, _, openapispecCMapName = getCRDDetails(crdDetailsString)
 
 		if kind == customResourceKind {
-			openapiData, err = readConfigMap(openapispecCMapName)
+			openapiData, err = readConfigMap(openapispecCMapName, "default")
 			if err != nil {
 				fmt.Printf("Error:%s\n", err.Error())
 				openapiData = "Could not find implementation details data."
@@ -275,7 +275,7 @@ func GetOpenAPISpec_prev(customResourceKind string) string {
 	return openAPISpec
 }
 
-func readConfigMap(implementationDetailsString string) (string, error) {
+func readConfigMap(implementationDetailsString string, namespace string) (string, error) {
 
 	kubeClient, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
@@ -285,7 +285,7 @@ func readConfigMap(implementationDetailsString string) (string, error) {
 
 	fields := strings.Split(implementationDetailsString, ".")
 
-	namespace := "default"
+	//namespace := "default"
 	var configMapName, dataFieldName string
 	if len(fields) >= 3 {
 		namespace = fields[0]
