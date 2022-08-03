@@ -191,12 +191,13 @@ func handleExplainEndpoint(request *restful.Request, response *restful.Response)
 func handleManPageEndpoint(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 
-	manPage := GetManPage(customResourceKind)
+	namespace := "default"
+	manPage := GetManPage(customResourceKind, namespace)
 
 	response.Write([]byte(manPage))
 }
 
-func GetManPage(customResourceKind string) string {
+func GetManPage(customResourceKind string, namespace string) string {
 	//fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 
 	/*implementationDetails, err := discovery.GetImplementationDetails(customResourceKind)
@@ -208,7 +209,7 @@ func GetManPage(customResourceKind string) string {
 	fmt.Println("Implementation choices:%v", implementationDetails)
 	*/
 
-	manPage := discovery.GetUsageDetails(customResourceKind)
+	manPage := discovery.GetUsageDetails(customResourceKind, namespace)
 	//fmt.Println("Usage guidelines:%v", manPage)
 
 	return manPage
@@ -233,7 +234,8 @@ func handleUsageEndpoint(request *restful.Request, response *restful.Response) {
 	customResourceKind := request.QueryParameter(KIND_QUERY_PARAM)
 	fmt.Printf("Custom Resource Kind:%s\n", customResourceKind)
 
-	usageDetails := discovery.GetUsageDetails(customResourceKind)
+	namespace := "default"
+	usageDetails := discovery.GetUsageDetails(customResourceKind, namespace)
 
 	fmt.Println("Usage details:%v", usageDetails)
 

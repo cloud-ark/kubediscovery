@@ -178,7 +178,8 @@ func main() {
 			}*/
 
 			kind := os.Args[2]
-			kubeconfig1 := os.Args[3]
+			namespace := os.Args[3]
+			kubeconfig1 := os.Args[4]
 			parts := strings.Split(kubeconfig1, "=")
 
 			if len(parts) == 2 && parts[1] != "" {
@@ -188,22 +189,32 @@ func main() {
 				discovery.BuildConfig("")
 			}
 
-			manPage := apiserver.GetManPage(kind)
+			manPage := apiserver.GetManPage(kind, namespace)
 			fmt.Printf("%s\n", manPage)
 		}
 		if commandType == "networkmetrics" {
-			discovery.BuildConfig("")
-			nodeName := os.Args[2]
-			cAdvisorMetrics := discovery.GetCAdvisorMetrics(nodeName)
-			fmt.Printf("-----\n")
-			fmt.Printf(cAdvisorMetrics)
+
+                        nodeName := os.Args[2]
+                        kubeconfig1 := os.Args[3]
+                        parts := strings.Split(kubeconfig1, "=")
+                        trimmedKubeconfig := strings.TrimSpace(parts[1])
+                        discovery.BuildConfig(trimmedKubeconfig)
+
+                        cAdvisorMetrics := discovery.GetCAdvisorMetrics(nodeName)
+                        fmt.Printf(cAdvisorMetrics)
 		}
 		if commandType == "podmetrics" {
-			discovery.BuildConfig("")
-			nodeName := os.Args[2]
-			podMetrics := discovery.GetKubeletMetrics(nodeName)
-			//fmt.Printf("-----\n")
-			fmt.Printf(podMetrics)
+
+                        nodeName := os.Args[2]
+                        kubeconfig1 := os.Args[3]
+                        parts := strings.Split(kubeconfig1, "=")
+                        trimmedKubeconfig := strings.TrimSpace(parts[1])
+                        discovery.BuildConfig(trimmedKubeconfig)
+
+                        podMetrics := discovery.GetKubeletMetrics(nodeName)
+                        //fmt.Printf("-----\n")
+                        fmt.Printf(podMetrics)
+
 		}
 	} else {
 		fmt.Printf("Running from within cluster.\n")
