@@ -3,6 +3,7 @@ module github.com/cloud-ark/kubediscovery
 go 1.12
 
 require (
+	//bitbucket.org/ww/goautoneg v0.0.0-20120707110453-75cd24fc2f2c
 	github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 	github.com/PuerkitoBio/purell v1.1.1
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578
@@ -54,6 +55,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.3.2
+	//github.com/ugorji/go v1.1.1 // indirect
 	golang.org/x/crypto v0.0.0-20200220183623-bac4c82f6975
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	golang.org/x/sys v0.0.0-20191022100944-742c48ecaeb7

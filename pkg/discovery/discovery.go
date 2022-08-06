@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"gopkg.in/yaml.v2"
 
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
-    apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+    apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -148,7 +148,7 @@ func parseCRDAnnotions(crdObj *apiextensionsv1beta1.CustomResourceDefinition) {
 
 	//fmt.Printf("Inside parseCRDAnnotions\n")
 	group := crdObj.Spec.Group
-	version := crdObj.Spec.Version
+	version := crdObj.Spec.Versions[0].Name
 	endpoint := "apis/" + group + "/" + version
 	kind := crdObj.Spec.Names.Kind
 	plural := crdObj.Spec.Names.Plural

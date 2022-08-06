@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1beta1"
+	apiextensionsclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
 
 	"github.com/coreos/etcd/client"
 	"k8s.io/client-go/kubernetes"
@@ -100,7 +100,7 @@ func GetUsageDetails(customResourceKind string, namespace string) (string) {
 				objectMeta := crdObj.ObjectMeta
 				annotations := objectMeta.GetAnnotations()
 				group = crdObj.Spec.Group
-				version = crdObj.Spec.Version
+				version = crdObj.Spec.Versions[0].Name
 				usageDetailsCMapName := annotations[USAGE_ANNOTATION]
 				//fmt.Printf("usageDetailsCMapName:%s\n", usageDetailsCMapName)
 				if usageDetailsCMapName != "" {
