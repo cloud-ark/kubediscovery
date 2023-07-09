@@ -273,7 +273,7 @@ func init() {
 	relationshipMap[SERVICE] = serviceRelationships
 
 	KindPluralMap[INGRESS] = "ingresses"
-	kindVersionMap[INGRESS] = "networking.k8s.io/v1beta1"//"extensions/v1beta1"
+	kindVersionMap[INGRESS] = "networking.k8s.io/v1"//"extensions/v1beta1"
 	kindGroupMap[INGRESS] = "networking.k8s.io"
 	compositionMap[INGRESS] = []string{}
 	ingressRelationships := make([]string,0)
@@ -315,7 +315,7 @@ func init() {
 	ssRel1 := "owner reference, of:ReplicaSet, value:INSTANCE.name"
 	ssetRelationships = append(ssetRelationships, ssRel1)
 	ssRel2 := "owner reference, of:Pod, value:INSTANCE.name"
-	ssetRelationships = append(ssetRelationships, ssRel2)	
+	ssetRelationships = append(ssetRelationships, ssRel2)
 	relationshipMap[STATEFULSET] = ssetRelationships
 
 	KindPluralMap[CONFIG_MAP] = "configmaps"

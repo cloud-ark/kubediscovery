@@ -53,6 +53,16 @@ func homeDir() string {
 }
 
 func BuildConfig(kubeconfigpath string) (*rest.Config, error) {
+	if kubeconfigpath == "" {
+		cfg, err = rest.InClusterConfig()
+                if err != nil {
+                     panic(err)
+                                //return nil, err
+                 }
+		return cfg, err
+
+	}
+
 	if yyy, err := os.Stat(kubeconfigpath); err != nil {
 		fmt.Printf("YYY:%v\n",yyy)
 		fmt.Printf("Kubeconfigpath:%s\n", kubeconfigpath)
@@ -350,6 +360,22 @@ func CheckExistence(kind, instance, namespace string) bool {
 	}
 	return true
 }
+
+func findRelatedKinds1(kind string) []string{
+	relatedKinds := make([]string, 0)
+	relStringList := relationshipMap[kind]
+	for _, relString := range relStringList {
+		_, _, _, targetKindList := parseRelationship(relString)
+		for _, targetKind := range targetKindList {
+			//fmt.Printf("Kind:%s TargetKind:%s\n", kind, targetKind)
+			relatedKinds = append(relatedKinds, targetKind)
+		}
+	}
+
+	//fmt.Printf("Related kinds:%v\n", relatedKinds)
+	return relatedKinds
+}
+
 
 func findRelatedKinds(kind string) []string{
 	relatedKinds := make([]string, 0)

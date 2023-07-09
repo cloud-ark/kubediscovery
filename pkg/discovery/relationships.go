@@ -70,8 +70,9 @@ func GetRelatives(visited [] Connection, level int, kind, instance, origkind, or
 
 func findRelatives(visited []Connection, level int, kind, instance, origkind, originstance, namespace string, relType string) ([]Connection) {
 	relStringList := relationshipMap[kind]
-	visited = findDownstreamRelatives(visited, level, kind, instance, namespace, relStringList)
+	//fmt.Printf("RelationshipMap:%v\n", relationshipMap)
 	//fmt.Printf("Kind:%s, relStringList:%v\n",kind, relStringList)
+	visited = findDownstreamRelatives(visited, level, kind, instance, namespace, relStringList)
 
 	relatedKindList := findRelatedKinds(kind)
 	//fmt.Printf("Kind:%s, Related Kind List 1:%v\n", kind, relatedKindList)
@@ -92,15 +93,17 @@ func findDownstreamRelatives(visited []Connection, level int, kind, instance, na
 		//fmt.Printf("Reltype:%s, lhs:%s, rhs:%s, TargetKindList:%v\n", relType, lhs, rhs, targetKindList)
 		for _, targetKind := range targetKindList {
 			if relType == relTypeLabel {
+				//fmt.Printf("Kind:%s, Instance:%s, Namespace:%s TargetKind:%s\n", kind, instance, namespace, targetKind)
 				selectorLabelMap := getSelectorLabels(kind, instance, namespace)
+				//fmt.Printf("Selector LabelMap:%v\n", selectorLabelMap)
 				relativesNames, relDetail := searchLabels(level, kind, instance, selectorLabelMap, targetKind, namespace)
-				//fmt.Printf("FDSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
+				//fmt.Printf("FDSR label - Relnames:%v RelDetail:%v\n", relativesNames, relDetail)
 				visited = buildGraph(visited, level, kind, instance, relativesNames, targetKind, namespace, relType, relDetail)
 			}
 			if relType == relTypeSpecProperty {
 				targetInstance := "*"
 				relativesNames, relDetail, relTypeSpecific := searchSpecProperty(level, kind, instance, namespace, lhs, rhs, targetKind, targetInstance)
-				relType = relTypeSpecific			
+				relType = relTypeSpecific
 				//fmt.Printf("FDSR Spec - Relnames:%v Relatives:%v\n", relativesNames, relatives)
 				visited = buildGraph(visited, level, kind, instance, relativesNames, targetKind, namespace, relType, relDetail)
 			}
@@ -145,9 +148,11 @@ func findUpstreamRelatives(visited []Connection, level int, relatedKind, kind, i
 		for _, targetKind := range targetKindList {
 			if targetKind == kind {
 				if relType == relTypeLabel {
+					//fmt.Printf("ABC - Kind:%s, Instance:%s, Namespace%s", kind, instance, namespace)
 					labelMap := getLabels(kind, instance, namespace)
+					//fmt.Printf("ABC - labelMap:%v\n", labelMap)
 					relativesNames, relDetail := searchSelectors(level, relatedKind, labelMap, kind, instance, namespace)
-					//fmt.Printf("FUSR label - Relnames:%v Relatives:%v\n", relativesNames, relatives)
+					//fmt.Printf("FUSR label - Relnames:%v Relatives:%v\n", relativesNames, relDetail)
 					visited = buildGraph(visited, level, kind, instance, relativesNames, relatedKind, namespace, relType, relDetail)
 				}
 				if relType == relTypeSpecProperty {
@@ -179,7 +184,7 @@ func buildGraph(visited []Connection, level int, kind, instance string, relative
 	visited = searchNextLevel(visited, level, unseenRelatives, kind, instance, targetKind, namespace, relType)
 
 	for _, conn := range seenRelatives {
-		TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)			
+		TotalClusterConnections = AppendConnections(TotalClusterConnections, conn)
 	}
 
 	return visited
@@ -191,8 +196,8 @@ func filterConnections(allConnections []Connection, currentConnections []Connect
 	for _, currentConn := range currentConnections {
 		found := false
 		for _, conn := range allConnections {
-			if currentConn.Name == conn.Name && 
-			   currentConn.Kind == conn.Kind && 
+			if currentConn.Name == conn.Name &&
+			   currentConn.Kind == conn.Kind &&
 			   currentConn.Namespace == conn.Namespace {
 				found = true
 				// Note that the connection object in allConnections might 
@@ -464,6 +469,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 	}
 	lhsInstList, err := getObjects(kind, instance, lhsNamespace, lhsRes, dynamicClient)
 	if err != nil {
+		//fmt.Printf("lhsInstList:%v", err)
 		return relativesNames, relDetail
 	}
 
@@ -478,6 +484,7 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 	}
 	rhsInstList, err := getObjects(targetKind, targetInstance, rhsNamespace, rhsRes, dynamicClient)
 	if err != nil {
+		//fmt.Printf("rhsInstList:%v", err)
 		return relativesNames, relDetail
 	}
 	//fmt.Printf("RHSList:%v\n", rhsInstList)
@@ -499,11 +506,11 @@ func searchAnnotations(level int, kind, instance, namespace, annotationKey, anno
 			annotations := unstructuredObj.GetAnnotations()
 			//fmt.Printf("AnnotationMap:%v\n", annotations)
 			for key, value := range annotations {
-				//fmt.Printf("Key:%s, AnnotationKey:%s, value:%s, lhsName:%s\n", key, annotationKey, value, lhsName)
+			//	fmt.Printf("Key:%s, AnnotationKey:%s, value:%s, lhsName:%s\n", key, annotationKey, value, lhsName)
 				if instance == "*" {
 					if key == annotationKey && (value == lhsName || (value == fqvalue) || strings.Contains(value, lhsName)) {
 						//rhsInstanceName := unstructuredObj.GetName()
-						//fmt.Printf("RHSKIND:%s RHS InstanceName:%s\n", targetKind, rhsInstanceName)
+			//			fmt.Printf("RHSKIND:%s RHS InstanceName:%s\n", targetKind, rhsInstanceName)
 						relDetail = annotationKey + "::" + annotationValue
 						conn := Connection{
 							Level: level,
@@ -943,10 +950,6 @@ func parseRelationship(relString string) (string, string, string, []string) {
 
 func getLabels(kind, instance, namespace string) map[string]string {
 	labelMap := make(map[string]string)
-	if err != nil {
-		//fmt.Printf(err.Error())
-		return labelMap
-	}
 	resourceKindPlural, _, resourceApiVersion, resourceGroup := getKindAPIDetails(kind)
 	//fmt.Printf("%s, %s, %s\n", resourceGroup, resourceApiVersion, resourceKindPlural)
 	res := schema.GroupVersionResource{Group: resourceGroup,
@@ -961,8 +964,7 @@ func getLabels(kind, instance, namespace string) map[string]string {
 	// (May 13, 2021): Look up from cache
 	instanceObj, err := getKubeObject(kind, instance, namespace, res)
 	if err != nil {
-		//fmt.Printf("ABC\n")
-		//fmt.Printf(err.Error())
+		fmt.Printf(err.Error())
 		return labelMap
 	}
 	labelMap = instanceObj.GetLabels()
@@ -1091,6 +1093,8 @@ func searchLabels(level int, sourceKind, sourceInstance string, labelMap map[str
 		unstructuredObjLabelMap := unstructuredObj.GetLabels()
 		match := false
 		if len(labelMap) > 0 {
+			//fmt.Printf("Service Labels:%v\n",labelMap)
+			//fmt.Printf("Pod Labels:%v\n",unstructuredObjLabelMap)
 			match = subsetMatchMaps(labelMap, unstructuredObjLabelMap)
 		} else {
 			match = searchNameInLabels(sourceInstance, unstructuredObjLabelMap)
@@ -1115,6 +1119,7 @@ func searchLabels(level int, sourceKind, sourceInstance string, labelMap map[str
 			instanceNames = append(instanceNames, instanceName)
 		}
 	}
+	//fmt.Printf("Instance Names:%v\n",instanceNames)
 	return instanceNames, relDetail
 }
 
