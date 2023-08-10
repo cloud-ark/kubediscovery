@@ -277,7 +277,7 @@ func init() {
 	kindGroupMap[INGRESS] = "networking.k8s.io"
 	compositionMap[INGRESS] = []string{}
 	ingressRelationships := make([]string,0)
-	ingressRel := "specproperty, on:INSTANCE.spec.rules.http.paths.backend.serviceName, value:Service.spec.metadata.name"
+	ingressRel := "specproperty, on:INSTANCE.spec.rules.http.paths.backend.service.name, value:Service.spec.metadata.name"
 	ingressRelationships = append(ingressRelationships, ingressRel)
 	relationshipMap[INGRESS] = ingressRelationships
 
